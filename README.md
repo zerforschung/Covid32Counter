@@ -2,4 +2,4 @@
 
 ## Wire Protocol
 
-![Protocol Diagram](protocol.svg)
+![Protocol Diagram](protocol_v1.svg)

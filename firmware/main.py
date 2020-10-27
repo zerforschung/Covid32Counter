@@ -5,6 +5,7 @@ import network
 import ntptime
 import ubluetooth
 import uhashlib
+import uos
 import ustruct
 import utime
 
@@ -18,6 +19,7 @@ SCAN_TIME = const(2)  # seconds
 SLEEP_TIME = const(7)  # seconds
 AP_NAME = "BGV Wi-Fi"
 AP_PASS = None
+CLIENT_ID = uos.urandom(2)  # set random 2-byte client ID
 # UPLOAD_URL = "https://requestbin.io/1jk439t1"
 # UPLOAD_URL = "http://requestbin.net/zvr97czv"
 UPLOAD_URL = "http://backend:1919/"
@@ -88,18 +90,21 @@ connected = connectWLAN(AP_NAME, AP_PASS)
 # micropython's epoch begins at 2000-01-01 00:00:00, so we add _EPOCH_OFFSET
 timeStamp = util.now()
 
-payload = ustruct.pack("<i", timeStamp)  # encode timestamp
-payload += ustruct.pack("<B", len(nets))  # encode wifi count
-payload += ustruct.pack("<B", len(beacons))  # encode BLE beacon count
+payload = ustruct.pack(">3s", "CWA")  # encode magic
+payload += ustruct.pack(">B", 1)  # encode version number
+payload += ustruct.pack(">i", timeStamp)  # encode timestamp
+payload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
+payload += ustruct.pack(">B", len(nets))  # encode wifi count
+payload += ustruct.pack(">B", len(beacons))  # encode BLE beacon count
 
 # encode mac/rssi for every wifi
 for net in nets:
     ssid, mac, channel, rssi, authmode, hidden = net
-    payload += ustruct.pack("<6sb", mac, rssi)
+    payload += ustruct.pack(">6sb", mac, rssi)
 
 # encode beacons
 for beacon, rssi in beacons.items():
-    payload += ustruct.pack("<20s", beacon)
+    payload += ustruct.pack(">20s", beacon)
 
 #     print(
 #         """Beacon Length: {}
@@ -174,7 +179,7 @@ if writeToFlash or not connected:
     util.syslog("Storage", "Storing...")
     util.syslog("Storage", "TODO")
     util.syslog("RTC", "Setting bits so next run we try to upload stored measurements.")
-    rtc.memory(ustruct.pack("<?", True))
+    rtc.memory(ustruct.pack(">b", True))
     util.syslog("Storage", "Done.")
 
 
