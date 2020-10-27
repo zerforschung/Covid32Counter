@@ -62,7 +62,7 @@ def bleInterruptHandler(event: int, data):
 
 needsUpload = False
 
-util.syslog("RTC", "Init..")
+util.syslog("RTC", "Init...")
 rtc = machine.RTC()
 rtcMem = rtc.memory()
 if len(rtcMem) > 0:
