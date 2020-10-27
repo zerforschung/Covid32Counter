@@ -16,6 +16,8 @@ import uuurequests
 
 SCAN_TIME = const(2)  # seconds
 SLEEP_TIME = const(7)  # seconds
+AP_NAME = "BGV Wi-Fi"
+AP_PASS = None
 # UPLOAD_URL = "https://requestbin.io/1jk439t1"
 # UPLOAD_URL = "http://requestbin.net/zvr97czv"
 UPLOAD_URL = "http://backend:1919/"
@@ -81,7 +83,7 @@ wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 wlan.disconnect()
 nets = wlan.scan()
-connectWLAN("BVG Wi-Fi")
+connected = connectWLAN(AP_NAME, AP_PASS)
 
 # micropython's epoch begins at 2000-01-01 00:00:00, so we add _EPOCH_OFFSET
 timeStamp = util.now()
