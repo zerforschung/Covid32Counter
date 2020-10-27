@@ -66,7 +66,10 @@ util.syslog("RTC", "Init...")
 rtc = machine.RTC()
 rtcMem = rtc.memory()
 if len(rtcMem) > 0:
-    needsUpload = ustruct.unpack("<?", rtcMem)
+    util.syslog(
+        "RTC", "Bits to upload stored measurements is set, scheduling upload..."
+    )
+    needsUpload = ustruct.unpack(">b", rtcMem)
 
 beacons = {}
 util.syslog("BLE", "Starting Bluetooth...")
