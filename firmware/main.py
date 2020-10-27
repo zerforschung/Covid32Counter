@@ -1,6 +1,5 @@
 from micropython import const
 
-import gc
 import machine
 import network
 import ntptime
@@ -11,76 +10,65 @@ import ustruct
 import utime
 
 import exposure_notification
+import util
 import uuurequests
 
 _SCAN_TIME = const(2)  # seconds
 _SLEEP_TIME = const(5)  # seconds
 
-_SEC_2_USEC = const(1000 * 1000)
-_SEC_2_MSEC = const(1000)
-
-_EPOCH_OFFSET = const(946681200)  # seconds between 1970 and 2000
-
-_IRQ_SCAN_RESULT = const(5)
-_IRQ_SCAN_DONE = const(6)
 
 
-
-def collectGarbage():
-    print(
-        "--- [GC] before collection: {} allocated, {} free ---".format(
-            gc.mem_alloc(), gc.mem_free()
-        )
-    )
-    gc.collect()
-    print(
-        "--- [GC] after collection: {} allocated, {} free ---".format(
-            gc.mem_alloc(), gc.mem_free()
-        )
-    )
-
-
-def connectWLAN(name: str, passphrase: str):
+@micropython.native
+def connectWLAN(name: str, passphrase: str) -> bool:
+    util.syslog("Wifi", "Connecting...")
     wlan.connect(name, passphrase)
     connect_delay_counter = 0
     while not wlan.isconnected():
         if connect_delay_counter > 10:
+            util.syslog("Wifi", "Timeout.")
             return False
         connect_delay_counter = connect_delay_counter + 1
         utime.sleep_ms(500)
-        print(".")
+        util.syslog("Wifi", ".")
+
+    util.syslog("Wifi", "Connected.")
 
     # if we didn't wake up from deepsleep, we lost the RTC-RAM and need to get the current time
     if machine.reset_cause() != machine.DEEPSLEEP:
         ntptime.settime()
+        util.syslog("Time", rtc.datetime())
 
     return True
 
 
 def bleInterruptHandler(event: int, data):
-    if event == _IRQ_SCAN_RESULT:
-        addr_type, addr, adv_type, rssi, adv_data = data
+    if event == util.IRQ_SCAN_RESULT:
+        (addr_type, addr, adv_type, rssi, adv_data) = data
 
         if exposure_notification.isExposureNotification(adv_data):
             beacons[bytes(adv_data)[11:31]] = rssi
 
-    if event == _IRQ_SCAN_DONE:
+    if event == util.IRQ_SCAN_DONE:
+        util.syslog("BLE", "Scan done.")
         return
 
 
-# init RTC
+util.syslog("RTC", "Init..")
 rtc = machine.RTC()
 
 beacons = {}
+util.syslog("BLE", "Starting Bluetooth...")
 ble = ubluetooth.BLE()
 ble.active(True)
 ble.irq(bleInterruptHandler)
+util.syslog("BLE", "Scanning...")
 ble.gap_scan(
-    1000 * _SCAN_TIME,
-    1000 * 1000 * _SCAN_TIME,
-    1000 * 1000 * _SCAN_TIME,
+    util.second_to_microsecond(SCAN_TIME),
+    util.second_to_millisecond(SCAN_TIME),
+    util.second_to_millisecond(SCAN_TIME),
 )
 
+util.syslog("Wifi", "Starting Wifi...")
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 wlan.disconnect()
@@ -88,7 +76,7 @@ nets = wlan.scan()
 connectWLAN("BVG Wi-Fi")
 
 # micropython's epoch begins at 2000-01-01 00:00:00, so we add _EPOCH_OFFSET
-timeStamp = utime.time() + _EPOCH_OFFSET
+timeStamp = util.now()
 
 payload = ustruct.pack("<i", timeStamp)  # encode timestamp
 payload += ustruct.pack("<B", len(nets))  # encode wifi count
@@ -157,4 +145,5 @@ Matching: {}
     )
 # print("request took: {} ms".format(utime.ticks_diff(utime.ticks_ms(), t1)))
 
-# machine.deepsleep(_SEC_2_MSEC * _SLEEP_TIME)
+util.syslog("Machine", "Going to sleep for {} seconds...".format(SLEEP_TIME))
+machine.deepsleep(util.second_to_microsecond(SLEEP_TIME))
