@@ -10,6 +10,7 @@ import uhashlib
 import ustruct
 import utime
 
+import exposure_notification
 import uuurequests
 
 _SCAN_TIME = const(2)  # seconds
@@ -23,27 +24,6 @@ _EPOCH_OFFSET = const(946681200)  # seconds between 1970 and 2000
 _IRQ_SCAN_RESULT = const(5)
 _IRQ_SCAN_DONE = const(6)
 
-# see https://covid19.apple.com/contacttracing for description
-_EXPOSURE_NOTIFICATION_FLAGS_LENGTH = ubinascii.unhexlify("02")
-_EXPOSURE_NOTIFICATION_FLAGS_TYPE = ubinascii.unhexlify("01")
-_EXPOSURE_NOTIFICATION_FLAGS_FLAGS = ubinascii.unhexlify("1a")
-_EXPOSURE_NOTIFICATION_SERVICE_UUID_LENGTH = ubinascii.unhexlify("03")
-_EXPOSURE_NOTIFICATION_SERVICE_UUID_TYPE = ubinascii.unhexlify("03")
-_EXPOSURE_NOTIFICATION_SERVICE_UUID_UUID = ubinascii.unhexlify("6ffd")
-_EXPOSURE_NOTIFICATION_SERVICE_DATA_LENGTH = ubinascii.unhexlify("17")
-_EXPOSURE_NOTIFICATION_SERVICE_DATA_TYPE = ubinascii.unhexlify("16")
-_EXPOSURE_NOTIFICATION_SERVICE_DATA_UUID = ubinascii.unhexlify("6ffd")
-_EXPOSURE_NOTIFICATION = (
-    _EXPOSURE_NOTIFICATION_FLAGS_LENGTH
-    + _EXPOSURE_NOTIFICATION_FLAGS_TYPE
-    + _EXPOSURE_NOTIFICATION_FLAGS_FLAGS
-    + _EXPOSURE_NOTIFICATION_SERVICE_UUID_LENGTH
-    + _EXPOSURE_NOTIFICATION_SERVICE_UUID_TYPE
-    + _EXPOSURE_NOTIFICATION_SERVICE_UUID_UUID
-    + _EXPOSURE_NOTIFICATION_SERVICE_DATA_LENGTH
-    + _EXPOSURE_NOTIFICATION_SERVICE_DATA_TYPE
-    + _EXPOSURE_NOTIFICATION_SERVICE_DATA_UUID
-)
 
 
 def collectGarbage():
@@ -81,17 +61,8 @@ def bleInterruptHandler(event: int, data):
     if event == _IRQ_SCAN_RESULT:
         addr_type, addr, adv_type, rssi, adv_data = data
 
-        # ExposureNotifications are exactly 31 bytes long
-        if len(adv_data) != 31:
-            return
-
-        # ExposureNotications start with these 11 static bytes
-        if adv_data[0:11] != _EXPOSURE_NOTIFICATION:
-            return
-
-        # very likely a real ExposureNotification, add it to the list
-        beacons[bytes(adv_data)[11:31]] = rssi
-        return
+        if exposure_notification.isExposureNotification(adv_data):
+            beacons[bytes(adv_data)[11:31]] = rssi
 
     if event == _IRQ_SCAN_DONE:
         return
