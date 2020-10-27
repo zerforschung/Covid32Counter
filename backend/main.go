@@ -87,6 +87,7 @@ func decoderHandle(w http.ResponseWriter, r *http.Request) {
 	if err := binary.Read(metadataBytes, binary.BigEndian, &metadata); err != nil {
 		fmt.Println("metadata - binary.Read failed:", err)
 		http.Error(w, "Can't decode metadata.", http.StatusBadRequest)
+		return
 	}
 
 	wifis := make([]wifi_t, metadata.WifiCount)
@@ -95,6 +96,7 @@ func decoderHandle(w http.ResponseWriter, r *http.Request) {
 	if err := binary.Read(wifiBytes, binary.BigEndian, &wifis); err != nil {
 		fmt.Println("wifi - binary.Read failed:", err)
 		http.Error(w, "Can't decode wifi data.", http.StatusBadRequest)
+		return
 	}
 
 	beacons := make([]beacon_t, metadata.BeaconCount)
@@ -103,6 +105,7 @@ func decoderHandle(w http.ResponseWriter, r *http.Request) {
 	if err := binary.Read(beaconBytes, binary.BigEndian, &beacons); err != nil {
 		fmt.Println("beacon - binary.Read failed:", err)
 		http.Error(w, "Can't decode beacons data.", http.StatusBadRequest)
+		return
 	}
 
 	calculatedChecksum := sha1.Sum(payload)
@@ -150,6 +153,7 @@ Calculated Checksum: %X
 
 	if _, err := w.Write(calculatedChecksum[:]); err != nil {
 		fmt.Println("Response failed:", err)
+		return
 	}
 
 }
