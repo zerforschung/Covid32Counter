@@ -3,19 +3,22 @@ from micropython import const
 import machine
 import network
 import ntptime
-import ubinascii
 import ubluetooth
 import uhashlib
 import ustruct
 import utime
 
+# import ubinascii
+
 import exposure_notification
 import util
 import uuurequests
 
-_SCAN_TIME = const(2)  # seconds
-_SLEEP_TIME = const(5)  # seconds
-
+SCAN_TIME = const(2)  # seconds
+SLEEP_TIME = const(7)  # seconds
+# UPLOAD_URL = "https://requestbin.io/1jk439t1"
+# UPLOAD_URL = "http://requestbin.net/zvr97czv"
+UPLOAD_URL = "http://backend:1919/"
 
 
 @micropython.native
@@ -53,8 +56,13 @@ def bleInterruptHandler(event: int, data):
         return
 
 
+needsUpload = False
+
 util.syslog("RTC", "Init..")
 rtc = machine.RTC()
+rtcMem = rtc.memory()
+if len(rtcMem) > 0:
+    needsUpload = ustruct.unpack("<?", rtcMem)
 
 beacons = {}
 util.syslog("BLE", "Starting Bluetooth...")
@@ -89,61 +97,83 @@ for net in nets:
 
 # encode beacons
 for beacon, rssi in beacons.items():
-    print(
-        """Beacon Length: {}
-Beacon Content: {}
-Beacon RSSI: {}
-""".format(
-            len(beacon),
-            ubinascii.hexlify(beacon, "-"),
-            rssi,
-        )
-    )
-
     payload += ustruct.pack("<20s", beacon)
 
-hexPayload = ubinascii.hexlify(payload)
+#     print(
+#         """Beacon Length: {}
+# Beacon Content: {}
+# Beacon RSSI: {}
+# """.format(
+#             ubinascii.hexlify(beacon, "-"),
+#             rssi,
+#         )
+#     )
+#             len(beacon#),
+# hexPayload = ubinascii.hexlify(payload)
+# print(
+#     """
+# Payload Length: {}
+#
+# HexPayload: {}
 
-print(
-    """
-Payload Length: {}
-HexPayload: {}
+# Timestamp: {}
 
-Timestamp: {}
+# Wifi count: {}
 
-Wifi count: {}
+# Beacon count: {}
+# """.format(
+#         len(payload),
+#         hexPayload,
+#         timeStamp,
+#         len(nets),
+#         len(beacons),
+#     )
+# )
 
-Beacon count: {}
-""".format(
-        len(payload),
-        hexPayload,
-        timeStamp,
-        len(nets),
-        len(beacons),
-    )
-)
+util.collectGarbage()
 
-# url = "https://requestbin.io/1jk439t1"
-# url = "http://requestbin.net/zvr97czv"
-url = "http://backend:1919/"
+writeToFlash = False
 
-# collectGarbage()
-# t1 = utime.ticks_ms()
-checksumServer = uuurequests.post(url, data=payload).content
-checksumClient = uhashlib.sha1(payload).digest()
+if connected:
+    if needsUpload:
+        try:
+            util.syslog("Upload/Storage", "Uploading stored measurements...")
+            util.syslog("Upload/Storage", "TODO")
+        except Exception as e:
+            util.syslog(
+                "Upload", "Upload failed with error '{}', skipping...".format(e)
+            )
 
-if checksumClient == checksumServer:
-    print(
-        """Server returned checksum: {}
-Client calculated checksum: {}
-Matching: {}
-""".format(
-            ubinascii.hexlify(checksumServer),
-            ubinascii.hexlify(checksumClient),
-            checksumServer == checksumClient,
+    try:
+        util.syslog("Upload", "Uploading {} bytes...".format(len(payload)))
+        checksumServer = uuurequests.post(UPLOAD_URL, data=payload).content
+        checksumClient = uhashlib.sha1(payload).digest()
+
+        if checksumClient == checksumServer:
+            #     print(
+            #         """Server returned checksum: {}
+            # Client calculated checksum: {}
+            # Matching: {}
+            #             ubinascii.#hexlify(checksumServer),
+            #             ubinascii.hexlify(checksumClient),
+            #             checksumServer == checksumClient,
+            #         )
+            # """.format(#
+            #     )
+            util.syslog("Upload", "Successful.")
+    except Exception as e:
+        util.syslog(
+            "Upload", "Upload failed with error '{}', storing instead...".format(e)
         )
-    )
-# print("request took: {} ms".format(utime.ticks_diff(utime.ticks_ms(), t1)))
+        writeToFlash = True
+
+if writeToFlash or not connected:
+    util.syslog("Storage", "Storing...")
+    util.syslog("Storage", "TODO")
+    util.syslog("RTC", "Setting bits so next run we try to upload stored measurements.")
+    rtc.memory(ustruct.pack("<?", True))
+    util.syslog("Storage", "Done.")
+
 
 util.syslog("Machine", "Going to sleep for {} seconds...".format(SLEEP_TIME))
 machine.deepsleep(util.second_to_microsecond(SLEEP_TIME))
