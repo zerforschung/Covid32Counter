@@ -165,7 +165,8 @@ if connected:
             util.syslog("Upload", "Successful.")
     except Exception as e:
         util.syslog(
-            "Upload", "Upload failed with error '{}', storing instead...".format(e)
+            "Upload/Storage",
+            "Upload failed with error '{}', storing instead...".format(e),
         )
         writeToFlash = True
 
