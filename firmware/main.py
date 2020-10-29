@@ -5,7 +5,6 @@ import network
 import ntptime
 import ubluetooth
 import uhashlib
-import uos
 import ustruct
 import utime
 
