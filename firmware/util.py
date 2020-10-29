@@ -8,6 +8,8 @@ IRQ_SCAN_DONE = const(6)
 
 EPOCH_OFFSET = const(946681200)  # seconds between 1970 and 2000
 
+ONBOARD_LED = const(2)
+
 
 @micropython.native
 def second_to_millisecond(i: int) -> int:

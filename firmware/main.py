@@ -15,10 +15,7 @@ import exposure_notification
 import util
 import uuurequests
 
-SCAN_TIME = const(2)  # seconds
-SLEEP_TIME = const(7)  # seconds
-AP_NAME = "BGV Wi-Fi"
-AP_PASS = None
+DEBUG = True
 CLIENT_ID = const(1337)
 # UPLOAD_URL = "https://requestbin.io/1jk439t1"
 # UPLOAD_URL = "http://requestbin.net/zvr97czv"
@@ -58,6 +55,11 @@ def bleInterruptHandler(event: int, data):
     if event == util.IRQ_SCAN_DONE:
         util.syslog("BLE", "Scan done.")
         return
+
+
+if DEBUG:
+    p2 = machine.Pin(util.ONBOARD_LED, machine.Pin.OUT)
+    p2.on()
 
 
 needsUpload = False
