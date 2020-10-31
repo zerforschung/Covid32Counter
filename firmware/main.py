@@ -97,10 +97,13 @@ ble.active(True)
 ble.irq(bleInterruptHandler)
 util.syslog("BLE", "Scanning...")
 ble.gap_scan(
+    util.second_to_millisecond(SCAN_TIME),
     util.second_to_microsecond(SCAN_TIME),
-    util.second_to_millisecond(SCAN_TIME),
-    util.second_to_millisecond(SCAN_TIME),
+    util.second_to_microsecond(SCAN_TIME),
 )
+
+#temporary fix for parallel wifi and BLE scan
+utime.sleep_ms(util.second_to_millisecond(SCAN_TIME))
 
 util.syslog("Wifi", "Starting Wifi...")
 wlan = network.WLAN(network.STA_IF)
@@ -192,4 +195,4 @@ util.syslog(
     "Machine", "{} remaining wakeups until we try to upload...".format(WAKEUP_COUNTER)
 )
 util.syslog("Machine", "Going to sleep for {} seconds...".format(SLEEP_TIME))
-machine.deepsleep(util.second_to_microsecond(SLEEP_TIME))
+machine.deepsleep(util.second_to_millisecond(SLEEP_TIME))

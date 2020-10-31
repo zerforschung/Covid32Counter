@@ -13,12 +13,12 @@ ONBOARD_LED = const(2)
 
 @micropython.native
 def second_to_millisecond(i: int) -> int:
-    return i * 1000 * 1000
+    return i * 1000
 
 
 @micropython.native
 def second_to_microsecond(i: int) -> int:
-    return i * 1000
+    return i * 1000 * 1000
 
 
 @micropython.native
