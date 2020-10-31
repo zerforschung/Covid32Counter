@@ -1,5 +1,7 @@
 from micropython import const
 
+import btree
+import esp32
 import machine
 import network
 import ntptime
@@ -8,14 +10,16 @@ import uhashlib
 import ustruct
 import utime
 
-# import ubinascii
-
 import exposure_notification
 import util
 import uuurequests
 
+
 DEBUG = True
 CLIENT_ID = const(1337)
+WAKEUP_COUNTER = 10
+SCAN_TIME = const(1)  # seconds
+SLEEP_TIME = const(5)  # seconds
 # UPLOAD_URL = "https://requestbin.io/1jk439t1"
 # UPLOAD_URL = "http://requestbin.net/zvr97czv"
 UPLOAD_URL = "http://backend:1919/"
@@ -65,12 +69,22 @@ needsUpload = False
 
 util.syslog("RTC", "Init...")
 rtc = machine.RTC()
-rtcMem = rtc.memory()
-if len(rtcMem) > 0:
-    util.syslog(
-        "RTC", "Bits to upload stored measurements is set, scheduling upload..."
-    )
-    needsUpload = ustruct.unpack(">b", rtcMem)
+
+# RTC-RAM is empty after a real reboot (no deepsleep)
+if len(rtc.memory()) == 0:
+    util.syslog("RTC", "RTC-RAM clean...")
+    rtc.memory(ustruct.pack(">B", WAKEUP_COUNTER))
+    needsUpload = True
+
+# RTC-RAM not empty, get WAKEUP_COUNTER
+WAKEUP_COUNTER = ustruct.unpack(">B", rtc.memory())
+
+if WAKEUP_COUNTER == 0:
+    needsUpload = True
+
+# setup voltage measurements
+adc = machine.ADC(machine.Pin(36, machine.Pin.IN))
+adc.atten(adc.ATTN_11DB)
 
 beacons = {}
 util.syslog("BLE", "Starting Bluetooth...")
@@ -91,101 +105,87 @@ wlan.disconnect()
 nets = wlan.scan()
 connected = connectWLAN(AP_NAME, AP_PASS)
 
-# micropython's epoch begins at 2000-01-01 00:00:00, so we add _EPOCH_OFFSET
-timeStamp = util.now()
-
-payload = ustruct.pack(">3s", "CWA")  # encode magic
-payload += ustruct.pack(">B", 1)  # encode version number
-payload += ustruct.pack(">i", timeStamp)  # encode timestamp
-payload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
-payload += ustruct.pack(">B", len(nets))  # encode wifi count
-payload += ustruct.pack(">B", len(beacons))  # encode BLE beacon count
+framePayload = ustruct.pack(">i", util.now())  # encode timestamp
+framePayload += ustruct.pack(">H", adc.read_u16())  # encode battery level
+framePayload += ustruct.pack(">h", esp32.hall_sensor())  # encode hall sensor
+framePayload += ustruct.pack(">h", esp32.raw_temperature())  # encode temperature sensor
+framePayload += ustruct.pack(">B", len(nets))  # encode wifi count
+framePayload += ustruct.pack(">B", len(beacons))  # encode BLE beacon count
 
 # encode mac/rssi for every wifi
 for net in nets:
     ssid, mac, channel, rssi, authmode, hidden = net
-    payload += ustruct.pack(">6sb", mac, rssi)
+    framePayload += ustruct.pack(">6sb", mac, rssi)
 
 # encode beacons
 for beacon, rssi in beacons.items():
-    payload += ustruct.pack(">20s", beacon)
+    framePayload += ustruct.pack(">20s", beacon)
 
-#     print(
-#         """Beacon Length: {}
-# Beacon Content: {}
-# Beacon RSSI: {}
-# """.format(
-#             ubinascii.hexlify(beacon, "-"),
-#             rssi,
-#         )
-#     )
-#             len(beacon#),
-# hexPayload = ubinascii.hexlify(payload)
-# print(
-#     """
-# Payload Length: {}
-#
-# HexPayload: {}
 
-# Timestamp: {}
+util.syslog("Storage", "Storing...")
+try:
+    f = open("v1.db", "w+b")
+    db = btree.open(f)
+    db[uhashlib.sha256(framePayload).digest()[0:4]] = framePayload
+    db.flush()
+    f.flush()
+    db.close()
+except Exception as e:
+    print(e)
+    pass
+finally:
+    f.close()
+util.syslog("Storage", "Done.")
 
-# Wifi count: {}
+if needsUpload and connected:
+    util.syslog("Upload", "Uploading stored measurements...")
 
-# Beacon count: {}
-# """.format(
-#         len(payload),
-#         hexPayload,
-#         timeStamp,
-#         len(nets),
-#         len(beacons),
-#     )
-# )
+    packetPayload = ustruct.pack(">3s", "CWA")  # encode magic
+    packetPayload += ustruct.pack(">B", 1)  # encode version number
+    packetPayload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
 
-util.collectGarbage()
-
-writeToFlash = False
-
-if connected:
-    if needsUpload:
-        try:
-            util.syslog("Upload/Storage", "Uploading stored measurements...")
-            util.syslog("Upload/Storage", "TODO")
-        except Exception as e:
-            util.syslog(
-                "Upload", "Upload failed with error '{}', skipping...".format(e)
-            )
+    frameCount = 0
 
     try:
-        util.syslog("Upload", "Uploading {} bytes...".format(len(payload)))
-        checksumServer = uuurequests.post(UPLOAD_URL, data=payload).content
-        checksumClient = uhashlib.sha1(payload).digest()
+        f = open("v1.db", "w+b")
+        db = btree.open(f)
 
-        if checksumClient == checksumServer:
-            #     print(
-            #         """Server returned checksum: {}
-            # Client calculated checksum: {}
-            # Matching: {}
-            #             ubinascii.#hexlify(checksumServer),
-            #             ubinascii.hexlify(checksumClient),
-            #             checksumServer == checksumClient,
-            #         )
-            # """.format(#
-            #     )
-            util.syslog("Upload", "Successful.")
+        for frame in db:
+            frameCount += 1
+
+        packetPayload += ustruct.pack(">B", frameCount)  # encode amount of frames
+
+        for frame in db:
+            packetPayload += db[frame]  # add every frame
+
+        # add checksum
+        checksum = uhashlib.sha256(packetPayload).digest()
+        packetPayload += checksum
+
+        util.syslog("Upload", "Uploading {} bytes...".format(len(framePayload)))
+        returnedChecksum = uuurequests.post(UPLOAD_URL, data=packetPayload).content
+
+        if checksum != returnedChecksum:
+            raise "Checksum mismatch!"
+
+        util.syslog("Upload", "Successful, deleting frames...")
+        for frame in db:
+            del db[frame]
+
     except Exception as e:
-        util.syslog(
-            "Upload/Storage",
-            "Upload failed with error '{}', storing instead...".format(e),
-        )
-        writeToFlash = True
+        util.syslog("Upload", "Upload failed with error '{}', skipping...".format(e))
 
-if writeToFlash or not connected:
-    util.syslog("Storage", "Storing...")
-    util.syslog("Storage", "TODO")
-    util.syslog("RTC", "Setting bits so next run we try to upload stored measurements.")
-    rtc.memory(ustruct.pack(">b", True))
-    util.syslog("Storage", "Done.")
+    finally:
+        util.syslog("Storage", "Flushing database...")
+        db.flush()
+        db.close()
+        f.close()
 
 
+WAKEUP_COUNTER = WAKEUP_COUNTER - 1
+rtc.memory(ustruct.pack(">B", WAKEUP_COUNTER))
+util.syslog(
+    "Machine", "{} remaining wakeups until we try to upload...".format(WAKEUP_COUNTER)
+)
 util.syslog("Machine", "Going to sleep for {} seconds...".format(SLEEP_TIME))
 machine.deepsleep(util.second_to_microsecond(SLEEP_TIME))

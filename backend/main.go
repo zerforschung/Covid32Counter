@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	headerWireSize   = 4
-	metadataWireSize = 8
-	wifiWireSize     = 7
-	beaconWireSize   = 20
-	checksumWireSize = 20
+	packetHeaderWireSize = 7
+	frameHeaderWireSize  = 12
+	wifiWireSize         = 7
+	beaconWireSize       = 21
+	checksumWireSize     = 32
 )
 
 var CWA_MAGIC = [3]byte{
@@ -26,16 +26,20 @@ var CWA_MAGIC = [3]byte{
 	0x41, // A
 }
 
-type header_t struct {
-	Magic   [3]byte
-	Version uint8
+type packetHeader_t struct {
+	Magic      [3]byte
+	Version    uint8
+	ClientID   int16
+	FrameCount uint8
 }
 
-type metadata_t struct {
-	TimeStamp   int32
-	ClientID    int16
-	WifiCount   uint8
-	BeaconCount uint8
+type frameHeader_t struct {
+	TimeStamp        int32
+	BatteryStatus    uint16
+	HallSensor       int16
+	TemperaturSensor int16
+	WifiCount        uint8
+	BeaconCount      uint8
 }
 
 type wifi_t struct {
@@ -43,14 +47,18 @@ type wifi_t struct {
 	RSSI int8
 }
 
-type beacon_t [20]byte
-
-type protocol struct {
-	Header   header_t
-	Metadata metadata_t
-	Wifis    []wifi_t
-	Beacons  []beacon_t
+type beacon_t struct {
+	Data [20]byte
+	RSSI int8
 }
+
+// type protocol struct {
+// 	Header   packetHeader_t
+// 	Frame frameHeader_t
+// 	Wifis    []wifi_t
+// 	Beacons  []beacon_t
+// 	Checksum [32]byte
+// }
 
 func main() {
 	http.HandleFunc("/", decoderHandle)
@@ -66,40 +74,40 @@ func decoderHandle(w http.ResponseWriter, r *http.Request) {
 	payload, _ := ioutil.ReadAll(r.Body)
 	hexPayload := hex.EncodeToString(payload)
 
-	var header header_t
-	headerOffset := headerWireSize
-	headerBytes := bytes.NewReader(payload[0:headerOffset])
-	if err := binary.Read(headerBytes, binary.BigEndian, &header); err != nil {
+	var packetHeader packetHeader_t
+	packetHeaderOffset := packetHeaderWireSize
+	packetHeaderBytes := bytes.NewReader(payload[0:packetHeaderOffset])
+	if err := binary.Read(packetHeaderBytes, binary.BigEndian, &packetHeader); err != nil {
 		fmt.Println("header - binary.Read failed:", err)
-		http.Error(w, "Can't decode header.", http.StatusBadRequest)
+		http.Error(w, "Can't decode packet header.", http.StatusBadRequest)
 		return
 	}
 
-	if header.Magic != CWA_MAGIC {
+	if packetHeader.Magic != CWA_MAGIC {
 		fmt.Println("header - Magic not correct.")
 		http.Error(w, "You didn't say the magic word.", http.StatusBadRequest)
 		return
 	}
 
-	var metadata metadata_t
-	metadataOffset := headerOffset + metadataWireSize
-	metadataBytes := bytes.NewReader(payload[headerOffset:metadataOffset])
-	if err := binary.Read(metadataBytes, binary.BigEndian, &metadata); err != nil {
-		fmt.Println("metadata - binary.Read failed:", err)
-		http.Error(w, "Can't decode metadata.", http.StatusBadRequest)
+	var frame frameHeader_t
+	frameOffset := packetHeaderOffset + frameHeaderWireSize
+	frameBytes := bytes.NewReader(payload[packetHeaderOffset:frameOffset])
+	if err := binary.Read(frameBytes, binary.BigEndian, &frame); err != nil {
+		fmt.Println("frame - binary.Read failed:", err)
+		http.Error(w, "Can't decode frame.", http.StatusBadRequest)
 		return
 	}
 
-	wifis := make([]wifi_t, metadata.WifiCount)
-	wifiOffset := metadataOffset + len(wifis)*wifiWireSize
-	wifiBytes := bytes.NewReader(payload[metadataOffset:wifiOffset])
+	wifis := make([]wifi_t, frame.WifiCount)
+	wifiOffset := frameOffset + len(wifis)*wifiWireSize
+	wifiBytes := bytes.NewReader(payload[frameOffset:wifiOffset])
 	if err := binary.Read(wifiBytes, binary.BigEndian, &wifis); err != nil {
 		fmt.Println("wifi - binary.Read failed:", err)
 		http.Error(w, "Can't decode wifi data.", http.StatusBadRequest)
 		return
 	}
 
-	beacons := make([]beacon_t, metadata.BeaconCount)
+	beacons := make([]beacon_t, frame.BeaconCount)
 	beaconOffset := wifiOffset + len(wifis)*beaconWireSize
 	beaconBytes := bytes.NewReader(payload[wifiOffset:beaconOffset])
 	if err := binary.Read(beaconBytes, binary.BigEndian, &beacons); err != nil {
@@ -108,26 +116,28 @@ func decoderHandle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	calculatedChecksum := sha1.Sum(payload)
+	calculatedChecksum := sha256.Sum256(payload)
 
 	fmt.Printf(`
 Payload Length: %d
 HexPayload: %s
 
-Header Magic: %s
-Header Version: %d
+Packet Header Magic: %s
+Packet Header Version: %d
+Client ID: %d
+
+Frame Count: %d
 
 Timestamp: %d
-Client ID: %d
 
 Wifi Count: %d`,
 		len(payload),
 		hexPayload,
-		header.Magic,
-		header.Version,
-		time.Unix(int64(metadata.TimeStamp), 0).Unix(),
-		metadata.ClientID,
-		metadata.WifiCount,
+		packetHeader.Magic,
+		packetHeader.Version,
+		packetHeader.ClientID,
+		time.Unix(int64(frame.TimeStamp), 0).Unix(),
+		frame.WifiCount,
 	)
 
 	for _, w := range wifis {
@@ -138,12 +148,13 @@ Wifi Count: %d`,
 	}
 
 	fmt.Printf(`
-Beacon Count: %d`, metadata.BeaconCount)
+Beacon Count: %d`, frame.BeaconCount)
 
 	for _, b := range beacons {
 		fmt.Printf(`
 	Payload: %X
-`, b)
+	RSSI: %d
+`, b.Data, b.RSSI)
 	}
 
 	fmt.Printf(`
@@ -155,5 +166,4 @@ Calculated Checksum: %X
 		fmt.Println("Response failed:", err)
 		return
 	}
-
 }
