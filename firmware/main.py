@@ -43,9 +43,14 @@ def connectWLAN(name: str, passphrase: str) -> bool:
     util.syslog("Wifi", "Connected.")
 
     # if we didn't wake up from deepsleep, we lost the RTC-RAM and need to get the current time
+    # check of this should be done after captive portal login
     if machine.reset_cause() != machine.DEEPSLEEP:
-        ntptime.settime()
-        util.syslog("Time", rtc.datetime())
+        try:
+            ntptime.settime()
+            util.syslog("Time", rtc.datetime())
+        except Exception as e:
+            print("Error getting NTP", e)
+            pass
 
     return True
 
