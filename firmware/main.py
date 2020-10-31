@@ -58,7 +58,8 @@ def bleInterruptHandler(event: int, data):
             beacons[bytes(adv_data)[11:31]] = rssi
 
     if event == util.IRQ_SCAN_DONE:
-        util.syslog("BLE", "Scan done.")
+        util.syslog("BLE", "Scan done, stopping Bluetooth...")
+        ble.active(False)
         return
 
 
