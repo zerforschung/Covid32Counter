@@ -36,3 +36,11 @@ def collectGarbage():
     syslog("GC", "before collection: {} free".format(gc.mem_free()))
     gc.collect()
     syslog("GC", "after collection: {} free".format(gc.mem_free()))
+
+
+@micropython.native
+def openFile(filename: str):
+    try:
+       return open(filename, "r+b")
+    except OSError:
+       return open(filename, "w+b")

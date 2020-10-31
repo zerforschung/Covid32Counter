@@ -128,7 +128,7 @@ for beacon, rssi in beacons.items():
 
 util.syslog("Storage", "Storing...")
 try:
-    f = open("v1.db", "w+b")
+    f = util.openFile("v1.db")
     db = btree.open(f)
     db[uhashlib.sha256(framePayload).digest()[0:4]] = framePayload
     db.flush()
@@ -151,7 +151,7 @@ if needsUpload and connected:
     frameCount = 0
 
     try:
-        f = open("v1.db", "w+b")
+        f = util.openFile("v1.db")
         db = btree.open(f)
 
         for frame in db:
