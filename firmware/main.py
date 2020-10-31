@@ -82,7 +82,8 @@ if len(rtc.memory()) == 0:
 # RTC-RAM not empty, get WAKEUP_COUNTER
 WAKEUP_COUNTER = ustruct.unpack(">B", rtc.memory())[0]
 
-if WAKEUP_COUNTER == 0:
+if WAKEUP_COUNTER < 1:
+    WAKEUP_COUNTER = 0
     needsUpload = True
 
 # setup voltage measurements
