@@ -20,6 +20,7 @@ import uuurequests
 DEBUG = True
 CLIENT_ID = const(1337)
 WAKEUP_THRESHOLD = 3
+WIFI_CONNECT_TIMEOUT = 5  # second
 SCAN_TIME = const(1)  # seconds
 SLEEP_TIME = const(5)  # seconds
 AP_NAME = "Hotspot"
@@ -35,13 +36,11 @@ def connectWLAN(name: str, passphrase: str) -> bool:
     wlan.connect(name, passphrase)
     connect_delay_counter = 0
     while not wlan.isconnected():
-        if connect_delay_counter > 10:
+        if connect_delay_counter > 100 * WIFI_CONNECT_TIMEOUT:
             util.syslog("Wifi", "Timeout.")
             return False
         connect_delay_counter = connect_delay_counter + 1
-        utime.sleep_ms(500)
-        util.syslog("Wifi", ".")
-
+        utime.sleep_ms(10)
     util.syslog("Wifi", "Connected.")
     return True
 
@@ -106,7 +105,7 @@ ble.gap_scan(
 
 ble_scan_done = False
 while not ble_scan_done:
-    utime.sleep_ms(50)
+    utime.sleep_ms(10)
 
 gc.collect()
 
