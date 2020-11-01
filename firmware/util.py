@@ -41,6 +41,6 @@ def collectGarbage():
 @micropython.native
 def openFile(filename: str):
     try:
-       return open(filename, "r+b")
+        return open(filename, "r+b")
     except OSError:
-       return open(filename, "w+b")
+        return open(filename, "w+b")
