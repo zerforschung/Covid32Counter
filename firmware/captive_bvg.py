@@ -3,6 +3,7 @@ import ubinascii
 import utime
 from machine import RTC
 
+import util
 import uuurequests
 
 
@@ -26,7 +27,6 @@ def parseFormValues(text):
         valueStartIndex = text.find(valueFindStr, nameEndIndex) + len(valueFindStr)
         valueEndIndex = text.find("\"", valueStartIndex)
         value = text[valueStartIndex:valueEndIndex]
-        print(name, value)
         postFields.append(name + "=" + value)
         startIndex = valueEndIndex
 
@@ -34,7 +34,7 @@ def parseFormValues(text):
 
 
 def accept_captive_portal():
-    #get captive portal - change URL or get from Router IP? or via captive.apple.com?
+    #get captive portal via captive.apple.com
     #url = "http://ubahndepot.com/storage/share/tmp/captive_demo.html"
     url = "http://captive.apple.com"
     #url = "https://www.hotsplots.de/auth/login.php?res=notyet&uamip=10.0.160.1&uamport=80&challenge=8638ce7ac8088c170ae0076b0d4932cb&called=F6-F0-3E-40-07-DE&mac=E8-80-2E-EA-2A-2D&ip=10.0.175.201&nasid=BVG-Bahnhoefe&sessionid=5f93869200000463&userurl=http%3a%2f%2finit-p01st.push.apple.com%2fbag%3fv%3d1"
@@ -56,15 +56,13 @@ def accept_captive_portal():
     }
 
     if (text.find("<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>") == -1):
-        print("Captive Poral active")
+        util.syslog("Captive Portal BVG", "Captive Portal detected")
+
         postData = parseFormValues(text)
-        print("POST data")
-        print(postData)
         loginReqest = uuurequests.request("POST", "https://www.hotsplots.de/auth/login.php", headers=headers, data=postData)
         loginResponse = loginReqest.text
 
-        print("RESPONSE FROM POST")
-        print(loginResponse)
+        util.syslog("Captive Portal BVG", "Submitted first stage of captive portal")
 
         redirectSearch = "<meta http-equiv=\"refresh\" content=\"0;url="
         redirectStartIndex = loginResponse.find(redirectSearch) + len(redirectSearch)
@@ -72,20 +70,19 @@ def accept_captive_portal():
         redirectUrl = loginResponse[redirectStartIndex:redirectEndIndex]
         redirectUrl = redirectUrl.replace("&amp;","&")
 
-        print("redirectUrl")
-        print(redirectUrl)
+        util.syslog("Captive Portal BVG", "Detected URL for second stage. Submitting request (probably to local router)")
 
         try:
             redirectRequest = uuurequests.get(redirectUrl)
         except:
-            print("Problem open last step in captive portal login")
+            util.syslog("Captive Portal BVG", "Problem open second stage of captive portal login")
             return False
         #redirectRequest.text
-        print("captive portal login Success")
+        util.syslog("Captive Portal BVG", "Successfully logged in into captive portal")
         return True
         
     else:
-        print("no captive portal in place")
+        util.syslog("Captive Portal BVG", "No captive portal in place")
         return True
 
 
