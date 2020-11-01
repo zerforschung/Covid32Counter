@@ -1,5 +1,3 @@
-from micropython import const
-
 import btree
 import esp32
 import gc
@@ -16,17 +14,7 @@ import exposure_notification
 import util
 import uuurequests
 
-
-CLIENT_ID = const(1337)
-WAKEUP_THRESHOLD = 3
-WIFI_CONNECT_TIMEOUT = 5  # second
-SCAN_TIME = const(1)  # seconds
-SLEEP_TIME = const(5)  # seconds
-AP_NAME = "Hotspot"
-AP_PASS = None
-UPLOAD_URL = "http://backend:1919/"
-MAX_PACKET_SIZE = 10000
-MAX_FRAMES_PER_PACKET = 1
+import config
 
 
 def connectWLAN(name: str, passphrase: str) -> bool:
@@ -34,7 +22,7 @@ def connectWLAN(name: str, passphrase: str) -> bool:
     wlan.connect(name, passphrase)
     connect_delay_counter = 0
     while not wlan.isconnected():
-        if connect_delay_counter > 100 * WIFI_CONNECT_TIMEOUT:
+        if connect_delay_counter > 100 * config.WIFI_CONNECT_TIMEOUT:
             util.syslog("Wifi", "Timeout.")
             return False
         connect_delay_counter = connect_delay_counter + 1
@@ -75,7 +63,7 @@ try:
         wakeupCounter = ustruct.unpack(">B", rtc.memory())[0]
 
     wakeupCounter += 1
-    if wakeupCounter > WAKEUP_THRESHOLD:
+    if wakeupCounter > config.WAKEUP_THRESHOLD:
         needsUpload = True
 
     # setup voltage measurements
@@ -91,9 +79,9 @@ try:
     ble.irq(bleInterruptHandler)
     util.syslog("BLE", "Scanning...")
     ble.gap_scan(
-        util.second_to_millisecond(SCAN_TIME),
-        util.second_to_microsecond(SCAN_TIME),
-        util.second_to_microsecond(SCAN_TIME),
+        util.second_to_millisecond(config.SCAN_TIME),
+        util.second_to_microsecond(config.SCAN_TIME),
+        util.second_to_microsecond(config.SCAN_TIME),
     )
 
     ble_scan_done = False
@@ -128,7 +116,7 @@ try:
         framePayload += ustruct.pack(
             ">6sb", mac, rssi
         )  # encode mac/rssi for every wifi
-        if ssid.decode() == AP_NAME:
+        if ssid.decode() == config.AP_NAME:
             ap_available = True
 
     # encode beacons
@@ -151,7 +139,7 @@ try:
     gc.collect()
 
     if needsUpload and ap_available:
-        connected = connectWLAN(AP_NAME, AP_PASS)
+        connected = connectWLAN(config.AP_NAME, config.AP_PASS)
         gc.collect()
         if connected:
             has_web_connection = False
@@ -178,15 +166,15 @@ try:
                         packetPayload = ustruct.pack(">3s", "CWA")  # encode magic
                         packetPayload += ustruct.pack(">B", 1)  # encode version number
                         packetPayload += ustruct.pack(
-                            ">H", CLIENT_ID
+                            ">H", config.CLIENT_ID
                         )  # encode clientID
 
                         frames = b""
                         doneFrames = []
 
                         for frame in db:
-                            if (len(frames) > MAX_PACKET_SIZE) or (
-                                len(doneFrames) >= MAX_FRAMES_PER_PACKET
+                            if (len(frames) > config.MAX_PACKET_SIZE) or (
+                                len(doneFrames) >= config.MAX_FRAMES_PER_PACKET
                             ):
                                 break
                             frames += db[frame]  # add every frame
@@ -211,7 +199,7 @@ try:
                             "Upload", "Uploading {} bytes...".format(len(packetPayload))
                         )
                         returnedChecksum = uuurequests.post(
-                            UPLOAD_URL, data=packetPayload
+                            config.UPLOAD_URL, data=packetPayload
                         ).content
                         gc.collect()
 
@@ -241,18 +229,18 @@ try:
         else:
             util.syslog("Upload", "no connection, can't upload...")
 
-    if wakeupCounter <= WAKEUP_THRESHOLD:
+    if wakeupCounter <= config.WAKEUP_THRESHOLD:
         util.syslog(
             "Machine",
             "{} remaining wakeups until we try to upload...".format(
-                WAKEUP_THRESHOLD - wakeupCounter + 1
+                config.WAKEUP_THRESHOLD - wakeupCounter + 1
             ),
         )
     else:
         util.syslog(
             "Machine",
             "Upload failed for {} tries, trying next time again.".format(
-                wakeupCounter - WAKEUP_THRESHOLD
+                wakeupCounter - config.WAKEUP_THRESHOLD
             ),
         )
     rtc.memory(ustruct.pack(">B", wakeupCounter))
@@ -261,5 +249,5 @@ except Exception as e:
     util.syslog("Machine", "General error: {}".format(e))
 
 
-util.syslog("Machine", "Going to sleep for {} seconds...".format(SLEEP_TIME))
-machine.deepsleep(util.second_to_millisecond(SLEEP_TIME))
+util.syslog("Machine", "Going to sleep for {} seconds...".format(config.SLEEP_TIME))
+machine.deepsleep(util.second_to_millisecond(config.SLEEP_TIME))
