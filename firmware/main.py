@@ -11,6 +11,7 @@ import ustruct
 import utime
 
 import exposure_notification
+import captive_bvg
 import util
 import uuurequests
 
@@ -154,48 +155,59 @@ util.syslog("Storage", "Done.")
 if needsUpload and ap_available:
     connected = connectWLAN(AP_NAME, AP_PASS)
     if connected:
-        util.syslog("Upload", "Uploading stored measurements...")
-
-        packetPayload = ustruct.pack(">3s", "CWA")  # encode magic
-        packetPayload += ustruct.pack(">B", 1)  # encode version number
-        packetPayload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
-
-        frameCount = 0
-
+        has_web_connection = False
         try:
-            f = util.openFile("v1.db")
-            db = btree.open(f)
+            has_web_connection = captive_bvg.accept_captive_portal()
+        except:
+            util.syslog("Network", "Problem checking online status")
 
-            for frame in db:
-                frameCount += 1
+        if has_web_connection:
+            util.syslog("Network", "We should have a web connection")
+            util.syslog("Upload", "Uploading stored measurements...")
 
-            packetPayload += ustruct.pack(">B", frameCount)  # encode amount of frames
+            packetPayload = ustruct.pack(">3s", "CWA")  # encode magic
+            packetPayload += ustruct.pack(">B", 1)  # encode version number
+            packetPayload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
 
-            for frame in db:
-                packetPayload += db[frame]  # add every frame
+            frameCount = 0
 
-            # add checksum
-            checksum = uhashlib.sha256(packetPayload).digest()
-            packetPayload += checksum
+            try:
+                f = util.openFile("v1.db")
+                db = btree.open(f)
 
-            util.syslog("Upload", "Uploading {} bytes...".format(len(framePayload)))
-            returnedChecksum = uuurequests.post(UPLOAD_URL, data=packetPayload).content
+                for frame in db:
+                    frameCount += 1
 
-            if checksum != returnedChecksum:
-                raise "Checksum mismatch!"
+                packetPayload += ustruct.pack(">B", frameCount)  # encode amount of frames
 
-            util.syslog("Upload", "Successful, deleting frames...")
-            for frame in db:
-                del db[frame]
+                for frame in db:
+                    packetPayload += db[frame]  # add every frame
 
-        except Exception as e:
-            util.syslog("Upload", "Upload failed with error '{}', skipping...".format(e))
+                # add checksum
+                checksum = uhashlib.sha256(packetPayload).digest()
+                packetPayload += checksum
 
-        finally:
-            util.syslog("Storage", "Flushing database...")
-            db.flush()
-            db.close()
-            f.close()
+                util.syslog("Upload", "Uploading {} bytes...".format(len(framePayload)))
+                returnedChecksum = uuurequests.post(UPLOAD_URL, data=packetPayload).content
+
+                if checksum != returnedChecksum:
+                    raise "Checksum mismatch!"
+
+                util.syslog("Upload", "Successful, deleting frames...")
+                for frame in db:
+                    del db[frame]
+
+            except Exception as e:
+                util.syslog("Upload", "Upload failed with error '{}', skipping...".format(e))
+
+            finally:
+                util.syslog("Storage", "Flushing database...")
+                db.flush()
+                db.close()
+                f.close()
+
+        else:
+            util.syslog("Network", "Looks like we have no real connection")
     else:
         util.syslog("Upload", "no connection, can't upload...")
 
