@@ -5,7 +5,6 @@ import esp32
 import gc
 import machine
 import network
-import ntptime
 import ubinascii
 import ubluetooth
 import uhashlib
@@ -44,17 +43,6 @@ def connectWLAN(name: str, passphrase: str) -> bool:
         util.syslog("Wifi", ".")
 
     util.syslog("Wifi", "Connected.")
-
-    # if we didn't wake up from deepsleep, we lost the RTC-RAM and need to get the current time
-    # check of this should be done after captive portal login
-    if machine.reset_cause() != machine.DEEPSLEEP:
-        try:
-            ntptime.settime()
-            util.syslog("Time", rtc.datetime())
-        except Exception as e:
-            print("Error getting NTP", e)
-            pass
-
     return True
 
 
@@ -184,6 +172,11 @@ if needsUpload and ap_available:
 
         if has_web_connection:
             util.syslog("Network", "We should have a web connection")
+
+            # syncs time over NTP if needed
+            util.syncTime()
+            gc.collect()
+
             util.syslog("Upload", "Uploading stored measurements...")
 
             packetPayload = ustruct.pack(">3s", "CWA")  # encode magic

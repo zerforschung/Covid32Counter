@@ -1,4 +1,8 @@
 from micropython import const
+import machine
+import ntptime
+import ubinascii
+import uos
 import utime
 
 
@@ -36,3 +40,18 @@ def openFile(filename: str):
         return open(filename, "r+b")
     except OSError:
         return open(filename, "w+b")
+
+
+@micropython.native
+def syncTime():
+    if (
+        (machine.reset_cause() != machine.DEEPSLEEP)  # if fresh start
+        or (EPOCH_OFFSET + utime.time() < 1600000000)  # if time is before 2020-09-13
+        or ((ubinascii.crc32(uos.urandom(1)) % 10) == 0)  # if randInt%10 == 0
+    ):
+        try:
+            ntptime.settime()
+            syslog("Time", "Synced via NTP.")
+        except Exception as e:
+            syslog("Time", "Error getting NTP: {}", e)
+            pass
