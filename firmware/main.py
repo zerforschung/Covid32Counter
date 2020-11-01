@@ -19,7 +19,7 @@ import uuurequests
 
 DEBUG = True
 CLIENT_ID = const(1337)
-WAKEUP_COUNTER = 10
+WAKEUP_THRESHOLD = 3
 SCAN_TIME = const(1)  # seconds
 SLEEP_TIME = const(5)  # seconds
 AP_NAME = "Hotspot"
@@ -79,6 +79,7 @@ if DEBUG:
     p2.on()
 
 
+wakeupCounter = 0
 needsUpload = False
 
 util.syslog("RTC", "Init...")
@@ -87,14 +88,13 @@ rtc = machine.RTC()
 # RTC-RAM is empty after a real reboot (no deepsleep)
 if len(rtc.memory()) == 0:
     util.syslog("RTC", "RTC-RAM clean...")
-    rtc.memory(ustruct.pack(">B", WAKEUP_COUNTER))
     needsUpload = True
+else:
+    # RTC-RAM not empty, get wakeupCounter
+    wakeupCounter = ustruct.unpack(">B", rtc.memory())[0]
 
-# RTC-RAM not empty, get WAKEUP_COUNTER
-WAKEUP_COUNTER = ustruct.unpack(">B", rtc.memory())[0]
-
-if WAKEUP_COUNTER < 1:
-    WAKEUP_COUNTER = 0
+wakeupCounter += 1
+if wakeupCounter > WAKEUP_THRESHOLD:
     needsUpload = True
 
 # setup voltage measurements
@@ -207,6 +207,8 @@ if needsUpload and ap_available:
                 for frame in db:
                     del db[frame]
 
+                wakeupCounter = 0
+
             except Exception as e:
                 util.syslog(
                     "Upload", "Upload failed with error '{}', skipping...".format(e)
@@ -224,10 +226,21 @@ if needsUpload and ap_available:
         util.syslog("Upload", "no connection, can't upload...")
 
 
-WAKEUP_COUNTER = WAKEUP_COUNTER - 1
-rtc.memory(ustruct.pack(">B", WAKEUP_COUNTER))
-util.syslog(
-    "Machine", "{} remaining wakeups until we try to upload...".format(WAKEUP_COUNTER)
-)
+if wakeupCounter <= WAKEUP_THRESHOLD:
+    util.syslog(
+        "Machine",
+        "{} remaining wakeups until we try to upload...".format(
+            WAKEUP_THRESHOLD - wakeupCounter + 1
+        ),
+    )
+else:
+    util.syslog(
+        "Machine",
+        "Upload failed for {} tries, trying next time again.".format(
+            wakeupCounter - WAKEUP_THRESHOLD
+        ),
+    )
+
+rtc.memory(ustruct.pack(">B", wakeupCounter))
 util.syslog("Machine", "Going to sleep for {} seconds...".format(SLEEP_TIME))
 machine.deepsleep(util.second_to_millisecond(SLEEP_TIME))
