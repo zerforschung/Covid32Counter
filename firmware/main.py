@@ -11,6 +11,7 @@ import ustruct
 import utime
 
 import exposure_notification
+import captive_bvg
 import util
 import uuurequests
 
@@ -43,9 +44,14 @@ def connectWLAN(name: str, passphrase: str) -> bool:
     util.syslog("Wifi", "Connected.")
 
     # if we didn't wake up from deepsleep, we lost the RTC-RAM and need to get the current time
+    # check of this should be done after captive portal login
     if machine.reset_cause() != machine.DEEPSLEEP:
-        ntptime.settime()
-        util.syslog("Time", rtc.datetime())
+        try:
+            ntptime.settime()
+            util.syslog("Time", rtc.datetime())
+        except Exception as e:
+            print("Error getting NTP", e)
+            pass
 
     return True
 
@@ -110,7 +116,6 @@ wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 wlan.disconnect()
 nets = wlan.scan()
-connected = connectWLAN(AP_NAME, AP_PASS)
 
 framePayload = ustruct.pack(">i", util.now())  # encode timestamp
 framePayload += ustruct.pack(">H", adc.read_u16())  # encode battery level
@@ -119,10 +124,13 @@ framePayload += ustruct.pack(">h", esp32.raw_temperature())  # encode temperatur
 framePayload += ustruct.pack(">B", len(nets))  # encode wifi count
 framePayload += ustruct.pack(">B", len(beacons))  # encode BLE beacon count
 
+ap_available = False
 # encode mac/rssi for every wifi
 for net in nets:
     ssid, mac, channel, rssi, authmode, hidden = net
     framePayload += ustruct.pack(">6sb", mac, rssi)
+    if (ssid.decode() == AP_NAME):
+        ap_available = True
 
 # encode beacons
 for beacon, rssi in beacons.items():
@@ -144,49 +152,64 @@ finally:
     f.close()
 util.syslog("Storage", "Done.")
 
-if needsUpload and connected:
-    util.syslog("Upload", "Uploading stored measurements...")
+if needsUpload and ap_available:
+    connected = connectWLAN(AP_NAME, AP_PASS)
+    if connected:
+        has_web_connection = False
+        try:
+            has_web_connection = captive_bvg.accept_captive_portal()
+        except:
+            util.syslog("Network", "Problem checking online status")
 
-    packetPayload = ustruct.pack(">3s", "CWA")  # encode magic
-    packetPayload += ustruct.pack(">B", 1)  # encode version number
-    packetPayload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
+        if has_web_connection:
+            util.syslog("Network", "We should have a web connection")
+            util.syslog("Upload", "Uploading stored measurements...")
 
-    frameCount = 0
+            packetPayload = ustruct.pack(">3s", "CWA")  # encode magic
+            packetPayload += ustruct.pack(">B", 1)  # encode version number
+            packetPayload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
 
-    try:
-        f = util.openFile("v1.db")
-        db = btree.open(f)
+            frameCount = 0
 
-        for frame in db:
-            frameCount += 1
+            try:
+                f = util.openFile("v1.db")
+                db = btree.open(f)
 
-        packetPayload += ustruct.pack(">B", frameCount)  # encode amount of frames
+                for frame in db:
+                    frameCount += 1
 
-        for frame in db:
-            packetPayload += db[frame]  # add every frame
+                packetPayload += ustruct.pack(">B", frameCount)  # encode amount of frames
 
-        # add checksum
-        checksum = uhashlib.sha256(packetPayload).digest()
-        packetPayload += checksum
+                for frame in db:
+                    packetPayload += db[frame]  # add every frame
 
-        util.syslog("Upload", "Uploading {} bytes...".format(len(framePayload)))
-        returnedChecksum = uuurequests.post(UPLOAD_URL, data=packetPayload).content
+                # add checksum
+                checksum = uhashlib.sha256(packetPayload).digest()
+                packetPayload += checksum
 
-        if checksum != returnedChecksum:
-            raise "Checksum mismatch!"
+                util.syslog("Upload", "Uploading {} bytes...".format(len(framePayload)))
+                returnedChecksum = uuurequests.post(UPLOAD_URL, data=packetPayload).content
 
-        util.syslog("Upload", "Successful, deleting frames...")
-        for frame in db:
-            del db[frame]
+                if checksum != returnedChecksum:
+                    raise "Checksum mismatch!"
 
-    except Exception as e:
-        util.syslog("Upload", "Upload failed with error '{}', skipping...".format(e))
+                util.syslog("Upload", "Successful, deleting frames...")
+                for frame in db:
+                    del db[frame]
 
-    finally:
-        util.syslog("Storage", "Flushing database...")
-        db.flush()
-        db.close()
-        f.close()
+            except Exception as e:
+                util.syslog("Upload", "Upload failed with error '{}', skipping...".format(e))
+
+            finally:
+                util.syslog("Storage", "Flushing database...")
+                db.flush()
+                db.close()
+                f.close()
+
+        else:
+            util.syslog("Network", "Looks like we have no real connection")
+    else:
+        util.syslog("Upload", "no connection, can't upload...")
 
 
 WAKEUP_COUNTER = WAKEUP_COUNTER - 1
