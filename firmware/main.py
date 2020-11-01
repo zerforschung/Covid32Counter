@@ -56,7 +56,10 @@ def connectWLAN(name: str, passphrase: str) -> bool:
     return True
 
 
+@micropython.native
 def bleInterruptHandler(event: int, data):
+    global ble_scan_done
+
     if event == util.IRQ_SCAN_RESULT:
         (addr_type, addr, adv_type, rssi, adv_data) = data
 
@@ -66,6 +69,7 @@ def bleInterruptHandler(event: int, data):
     if event == util.IRQ_SCAN_DONE:
         util.syslog("BLE", "Scan done, stopping Bluetooth...")
         ble.active(False)
+        ble_scan_done = True
         return
 
 
@@ -108,8 +112,9 @@ ble.gap_scan(
     util.second_to_microsecond(SCAN_TIME),
 )
 
-#temporary fix for parallel wifi and BLE scan
-utime.sleep_ms(util.second_to_millisecond(SCAN_TIME))
+ble_scan_done = False
+while not ble_scan_done:
+    utime.sleep_ms(50)
 
 util.syslog("Wifi", "Starting Wifi...")
 wlan = network.WLAN(network.STA_IF)
