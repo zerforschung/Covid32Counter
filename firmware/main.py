@@ -122,6 +122,9 @@ wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 wlan.disconnect()
 nets = wlan.scan()
+if not needsUpload:
+    util.syslog("Wifi", "Stopping Wifi...")
+    wlan.active(False)
 
 framePayload = ustruct.pack(">i", util.now())  # encode timestamp
 framePayload += ustruct.pack(">H", adc.read_u16())  # encode battery level
