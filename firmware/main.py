@@ -201,7 +201,7 @@ if needsUpload and ap_available:
                 ).content
 
                 if checksum != returnedChecksum:
-                    raise "Checksum mismatch!"
+                    raise Exception("Checksum mismatch!")
 
                 util.syslog("Upload", "Successful, deleting frames...")
                 for frame in db:
