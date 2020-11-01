@@ -5,7 +5,6 @@ import uuurequests
 
 
 # collect all hidden form fields from HTML
-@micropython.native
 def parseFormValues(text: str) -> str:
     startIndex = 0
     postFields = []

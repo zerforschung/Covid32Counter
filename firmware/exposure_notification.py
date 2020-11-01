@@ -24,7 +24,6 @@ EXPOSURE_NOTIFICATION = (
 )
 
 
-@micropython.native
 def isExposureNotification(buf: memoryview) -> bool:
     # ExposureNotifications are exactly 31 bytes long
     if len(buf) != 31:

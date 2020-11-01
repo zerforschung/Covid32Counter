@@ -29,7 +29,6 @@ MAX_PACKET_SIZE = 10000
 MAX_FRAMES_PER_PACKET = 1
 
 
-@micropython.native
 def connectWLAN(name: str, passphrase: str) -> bool:
     util.syslog("Wifi", "Connecting...")
     wlan.connect(name, passphrase)
@@ -44,7 +43,6 @@ def connectWLAN(name: str, passphrase: str) -> bool:
     return True
 
 
-@micropython.native
 def bleInterruptHandler(event: int, data):
     global ble_scan_done
 
