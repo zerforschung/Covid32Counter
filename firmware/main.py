@@ -2,6 +2,7 @@ from micropython import const
 
 import btree
 import esp32
+import gc
 import machine
 import network
 import ntptime
@@ -101,6 +102,8 @@ if wakeupCounter > WAKEUP_THRESHOLD:
 adc = machine.ADC(machine.Pin(36, machine.Pin.IN))
 adc.atten(adc.ATTN_11DB)
 
+gc.collect()
+
 beacons = {}
 util.syslog("BLE", "Starting Bluetooth...")
 ble = ubluetooth.BLE()
@@ -117,6 +120,8 @@ ble_scan_done = False
 while not ble_scan_done:
     utime.sleep_ms(50)
 
+gc.collect()
+
 util.syslog("Wifi", "Starting Wifi...")
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
@@ -125,6 +130,8 @@ nets = wlan.scan()
 if not needsUpload:
     util.syslog("Wifi", "Stopping Wifi...")
     wlan.active(False)
+
+gc.collect()
 
 framePayload = ustruct.pack(">i", util.now())  # encode timestamp
 framePayload += ustruct.pack(">H", adc.read_u16())  # encode battery level
@@ -145,6 +152,7 @@ for net in nets:
 for beacon, rssi in beacons.items():
     framePayload += ustruct.pack(">20s", beacon)
 
+gc.collect()
 
 util.syslog("Storage", "Storing...")
 try:
@@ -161,12 +169,16 @@ finally:
     f.close()
 util.syslog("Storage", "Done.")
 
+gc.collect()
+
 if needsUpload and ap_available:
     connected = connectWLAN(AP_NAME, AP_PASS)
+    gc.collect()
     if connected:
         has_web_connection = False
         try:
             has_web_connection = captive_bvg.accept_captive_portal()
+            gc.collect()
         except Exception:
             util.syslog("Network", "Problem checking online status")
 
