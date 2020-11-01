@@ -1,3 +1,4 @@
+import gc
 import network
 import ubinascii
 import utime
@@ -56,11 +57,14 @@ def accept_captive_portal():
     }
 
     if (text.find("<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>") == -1):
+        gc.collect()
         util.syslog("Captive Portal BVG", "Captive Portal detected")
 
         postData = parseFormValues(text)
+        gc.collect()
         loginReqest = uuurequests.request("POST", "https://www.hotsplots.de/auth/login.php", headers=headers, data=postData)
         loginResponse = loginReqest.text
+        gc.collect()
 
         util.syslog("Captive Portal BVG", "Submitted first stage of captive portal")
 
@@ -69,11 +73,13 @@ def accept_captive_portal():
         redirectEndIndex = loginResponse.find("\"", redirectStartIndex)
         redirectUrl = loginResponse[redirectStartIndex:redirectEndIndex]
         redirectUrl = redirectUrl.replace("&amp;","&")
+        gc.collect()
 
         util.syslog("Captive Portal BVG", "Detected URL for second stage. Submitting request (probably to local router)")
 
         try:
-            redirectRequest = uuurequests.get(redirectUrl)
+            uuurequests.get(redirectUrl)
+            gc.collect()
         except:
             util.syslog("Captive Portal BVG", "Problem open second stage of captive portal login")
             return False
