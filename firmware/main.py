@@ -10,8 +10,8 @@ import uhashlib
 import ustruct
 import utime
 
-import exposure_notification
 import captive_bvg
+import exposure_notification
 import util
 import uuurequests
 
@@ -129,7 +129,7 @@ ap_available = False
 for net in nets:
     ssid, mac, channel, rssi, authmode, hidden = net
     framePayload += ustruct.pack(">6sb", mac, rssi)
-    if (ssid.decode() == AP_NAME):
+    if ssid.decode() == AP_NAME:
         ap_available = True
 
 # encode beacons
@@ -146,7 +146,7 @@ try:
     f.flush()
     db.close()
 except Exception as e:
-    print(e)
+    util.syslog("Storage", "Failed with error: {}".format(e))
     pass
 finally:
     f.close()
@@ -158,7 +158,7 @@ if needsUpload and ap_available:
         has_web_connection = False
         try:
             has_web_connection = captive_bvg.accept_captive_portal()
-        except:
+        except Exception:
             util.syslog("Network", "Problem checking online status")
 
         if has_web_connection:
@@ -178,7 +178,9 @@ if needsUpload and ap_available:
                 for frame in db:
                     frameCount += 1
 
-                packetPayload += ustruct.pack(">B", frameCount)  # encode amount of frames
+                packetPayload += ustruct.pack(
+                    ">B", frameCount
+                )  # encode amount of frames
 
                 for frame in db:
                     packetPayload += db[frame]  # add every frame
@@ -187,8 +189,10 @@ if needsUpload and ap_available:
                 checksum = uhashlib.sha256(packetPayload).digest()
                 packetPayload += checksum
 
-                util.syslog("Upload", "Uploading {} bytes...".format(len(framePayload)))
-                returnedChecksum = uuurequests.post(UPLOAD_URL, data=packetPayload).content
+                util.syslog("Upload", "Uploading {} bytes...".format(len(packetPayload)))
+                returnedChecksum = uuurequests.post(
+                    UPLOAD_URL, data=packetPayload
+                ).content
 
                 if checksum != returnedChecksum:
                     raise "Checksum mismatch!"
@@ -198,7 +202,9 @@ if needsUpload and ap_available:
                     del db[frame]
 
             except Exception as e:
-                util.syslog("Upload", "Upload failed with error '{}', skipping...".format(e))
+                util.syslog(
+                    "Upload", "Upload failed with error '{}', skipping...".format(e)
+                )
 
             finally:
                 util.syslog("Storage", "Flushing database...")
