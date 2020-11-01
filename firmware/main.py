@@ -142,17 +142,13 @@ gc.collect()
 
 util.syslog("Storage", "Storing...")
 try:
-    f = util.openFile("v1.db")
-    db = btree.open(f)
-    db[str(ubinascii.crc32(framePayload))] = framePayload
-    db.flush()
-    f.flush()
-    db.close()
+    with util.openFile("v1.db") as f:
+        db = btree.open(f)
+        db[str(ubinascii.crc32(framePayload))] = framePayload
+        db.close()
 except Exception as e:
     util.syslog("Storage", "Failed with error: {}".format(e))
     pass
-finally:
-    f.close()
 util.syslog("Storage", "Done.")
 
 gc.collect()
