@@ -5,6 +5,7 @@ import esp32
 import machine
 import network
 import ntptime
+import ubinascii
 import ubluetooth
 import uhashlib
 import ustruct
@@ -146,7 +147,7 @@ util.syslog("Storage", "Storing...")
 try:
     f = util.openFile("v1.db")
     db = btree.open(f)
-    db[uhashlib.sha256(framePayload).digest()[0:4]] = framePayload
+    db[str(ubinascii.crc32(framePayload))] = framePayload
     db.flush()
     f.flush()
     db.close()
