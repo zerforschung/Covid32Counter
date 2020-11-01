@@ -195,7 +195,9 @@ if needsUpload and ap_available:
                 checksum = uhashlib.sha256(packetPayload).digest()
                 packetPayload += checksum
 
-                util.syslog("Upload", "Uploading {} bytes...".format(len(packetPayload)))
+                util.syslog(
+                    "Upload", "Uploading {} bytes...".format(len(packetPayload))
+                )
                 returnedChecksum = uuurequests.post(
                     UPLOAD_URL, data=packetPayload
                 ).content
