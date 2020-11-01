@@ -42,7 +42,6 @@ def openFile(filename: str):
         return open(filename, "w+b")
 
 
-@micropython.native
 def syncTime():
     if (
         (machine.reset_cause() != machine.DEEPSLEEP)  # if fresh start
