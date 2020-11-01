@@ -234,7 +234,6 @@ if needsUpload and ap_available:
 
             finally:
                 util.syslog("Storage", "Flushing database...")
-                db.flush()
                 db.close()
                 f.close()
 
