@@ -1,5 +1,4 @@
 from micropython import const
-import gc
 import utime
 
 
