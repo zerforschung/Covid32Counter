@@ -25,9 +25,9 @@ SCAN_TIME = const(1)  # seconds
 SLEEP_TIME = const(5)  # seconds
 AP_NAME = "Hotspot"
 AP_PASS = None
-# UPLOAD_URL = "https://requestbin.io/1jk439t1"
-# UPLOAD_URL = "http://requestbin.net/zvr97czv"
 UPLOAD_URL = "http://backend:1919/"
+MAX_PACKET_SIZE = 10000
+MAX_FRAMES_PER_PACKET = 1
 
 
 @micropython.native
@@ -128,10 +128,9 @@ framePayload += ustruct.pack(">B", len(nets))  # encode wifi count
 framePayload += ustruct.pack(">B", len(beacons))  # encode BLE beacon count
 
 ap_available = False
-# encode mac/rssi for every wifi
 for net in nets:
     ssid, mac, channel, rssi, authmode, hidden = net
-    framePayload += ustruct.pack(">6sb", mac, rssi)
+    framePayload += ustruct.pack(">6sb", mac, rssi)  # encode mac/rssi for every wifi
     if ssid.decode() == AP_NAME:
         ap_available = True
 
@@ -178,43 +177,57 @@ if needsUpload and ap_available:
 
             util.syslog("Upload", "Uploading stored measurements...")
 
-            packetPayload = ustruct.pack(">3s", "CWA")  # encode magic
-            packetPayload += ustruct.pack(">B", 1)  # encode version number
-            packetPayload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
-
-            frameCount = 0
-
             try:
                 f = util.openFile("v1.db")
                 db = btree.open(f)
 
-                for frame in db:
-                    frameCount += 1
+                while True:
+                    packetPayload = ustruct.pack(">3s", "CWA")  # encode magic
+                    packetPayload += ustruct.pack(">B", 1)  # encode version number
+                    packetPayload += ustruct.pack(">H", CLIENT_ID)  # encode clientID
 
-                packetPayload += ustruct.pack(
-                    ">B", frameCount
-                )  # encode amount of frames
+                    frames = b""
+                    doneFrames = []
 
-                for frame in db:
-                    packetPayload += db[frame]  # add every frame
+                    for frame in db:
+                        if (len(frames) > MAX_PACKET_SIZE) or (
+                            len(doneFrames) >= MAX_FRAMES_PER_PACKET
+                        ):
+                            break
+                        frames += db[frame]  # add every frame
+                        doneFrames.append(frame)
 
-                # add checksum
-                checksum = uhashlib.sha256(packetPayload).digest()
-                packetPayload += checksum
+                    gc.collect()
 
-                util.syslog(
-                    "Upload", "Uploading {} bytes...".format(len(packetPayload))
-                )
-                returnedChecksum = uuurequests.post(
-                    UPLOAD_URL, data=packetPayload
-                ).content
+                    if len(doneFrames) == 0:
+                        break
 
-                if checksum != returnedChecksum:
-                    raise Exception("Checksum mismatch!")
+                    packetPayload += ustruct.pack(
+                        ">B", len(doneFrames)
+                    )  # encode amount of frames
+                    packetPayload += frames
 
-                util.syslog("Upload", "Successful, deleting frames...")
-                for frame in db:
-                    del db[frame]
+                    # add checksum
+                    checksum = uhashlib.sha256(packetPayload).digest()
+                    packetPayload += checksum
+                    gc.collect()
+
+                    util.syslog(
+                        "Upload", "Uploading {} bytes...".format(len(packetPayload))
+                    )
+                    returnedChecksum = uuurequests.post(
+                        UPLOAD_URL, data=packetPayload
+                    ).content
+                    gc.collect()
+
+                    if checksum != returnedChecksum:
+                        raise Exception("Checksum mismatch!")
+
+                    util.syslog("Upload", "Successful, deleting frames...")
+                    for frame in doneFrames:
+                        del db[frame]
+
+                    gc.collect()
 
                 wakeupCounter = 0
 
