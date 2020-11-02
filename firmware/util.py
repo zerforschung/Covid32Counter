@@ -15,11 +15,11 @@ ONBOARD_LED = const(2)
 
 
 def second_to_millisecond(i: int) -> int:
-    return i * 1000
+    return i * const(1000)
 
 
 def second_to_microsecond(i: int) -> int:
-    return i * 1000 * 1000
+    return i * const(1000 * 1000)
 
 
 def now() -> int:
@@ -40,7 +40,9 @@ def openFile(filename: str):
 def syncTime():
     if (
         (machine.reset_cause() != machine.DEEPSLEEP)  # if fresh start
-        or (EPOCH_OFFSET + utime.time() < 1600000000)  # if time is before 2020-09-13
+        or (
+            EPOCH_OFFSET + utime.time() < const(1600000000)
+        )  # if time is before 2020-09-13
         or ((ubinascii.crc32(uos.urandom(1)) % 10) == 0)  # if randInt%10 == 0
     ):
         try:
