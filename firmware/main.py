@@ -51,6 +51,7 @@ wakeupCounter = 0
 needsUpload = False
 
 try:
+    machine.freq(80000000)
     util.syslog("RTC", "Init...")
     rtc = machine.RTC()
 
@@ -67,7 +68,7 @@ try:
         needsUpload = True
 
     # setup voltage measurements
-    adc = machine.ADC(machine.Pin(36, machine.Pin.IN))
+    adc = machine.ADC(machine.Pin(34, machine.Pin.IN))
     adc.atten(adc.ATTN_11DB)
 
     gc.collect()
