@@ -122,7 +122,7 @@ func parseFrames(buf []byte, frameCount uint8) ([]frame_t, error) {
 		}
 
 		frames = append(frames, frame)
-		frameOffset = wifiOffset + beaconOffset + beaconEnd
+		frameOffset = beaconEnd
 	}
 
 	return frames, nil
