@@ -122,7 +122,7 @@ try:
 
     # encode beacons
     for beacon, rssi in beacons.items():
-        framePayload += ustruct.pack(">20s", beacon)
+        framePayload += ustruct.pack(">20sb", beacon, rssi)
 
     gc.collect()
 
