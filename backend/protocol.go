@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -43,9 +45,46 @@ type wifi_t struct {
 	RSSI int8
 }
 
+type wifi_go_t struct {
+	MAC  string `json:"macAddress"`
+	RSSI int8   `json:"signalStrength"`
+}
+
+func (w *wifi_t) toGoType() wifi_go_t {
+	sl := strings.Split(hex.EncodeToString(w.MAC[:]), "")
+	var sl2 []string
+	for i, v := range sl {
+		sl2 = append(sl2, v)
+		if i+1 == len(sl) {
+			break
+		}
+		if (i+1)%2 == 0 {
+			sl2 = append(sl2, ":")
+		}
+	}
+	macAddress := strings.Join(sl2, "")
+
+	return wifi_go_t{
+		strings.ToUpper(macAddress),
+		w.RSSI,
+	}
+}
+
 type beacon_t struct {
 	Data [20]byte
 	RSSI int8
+}
+
+type beacon_go_t struct {
+	Data string
+	RSSI int8
+}
+
+func (b *beacon_t) toGoType() beacon_go_t {
+	return beacon_go_t{
+		strings.ToUpper(hex.EncodeToString(b.Data[:])),
+		b.RSSI,
+	}
 }
 
 type frame_t struct {

@@ -99,6 +99,7 @@ try:
     if not needsUpload:
         util.syslog("Wifi", "Stopping Wifi...")
         wlan.active(False)
+    nets = util.removeIgnoredSSIDs(nets)
 
     gc.collect()
 
@@ -155,6 +156,10 @@ try:
 
                 # syncs time over NTP if needed
                 util.syncTime()
+                gc.collect()
+
+                # update config OTA if needed
+                util.otaUpdateConfig()
                 gc.collect()
 
                 util.syslog("Upload", "Uploading stored measurements...")
