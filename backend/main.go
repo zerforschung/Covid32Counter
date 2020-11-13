@@ -2,45 +2,145 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"crypto/sha256"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"os"
+	"strings"
+	"text/template"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
+const configTpl = `from micropython import const
+
+CLIENT_ID = const({{.ID}})
+WAKEUP_THRESHOLD = const({{.WakeupThreshold}})  # upload every N wakeups
+WIFI_CONNECT_TIMEOUT = const({{.WifiConnectTimeout}})  # seconds
+SCAN_TIME = const({{.ScanTime}})  # seconds
+SLEEP_TIME = const({{.SleepTime}})  # seconds
+AP_NAME = "{{.ApName}}"
+AP_PASS = "{{.ApPass}}"
+UPLOAD_URL = "{{.UploadURL}}"
+OTA_URL = "{{.OtaURL}}"
+MAX_PACKET_SIZE = const({{.MaxPacketSize}})  # bytes
+MAX_FRAMES_PER_PACKET = const({{.MaxFramesPerPacket}})
+
+SSID_EXCLUDE_PREFIX = [
+    "AndroidAP",
+]
+SSID_EXCLUDE_SUFFIX = [
+    "_nomap",
+    "iPhone",
+]
+SSID_EXCLUDE_REGEX = [
+    ".*[M|m]obile[ |\-|_]?[H|h]otspot.*",
+    ".*[M|m]obile[ |\-|_]?[W|w][I|i][ |\-]?[F|f][I|i].*",
+    ".*[M|m][I|i][\-]?[F|f][I|i].*",
+    ".*Samsung.*",
+    ".*BlackBerry.*",
+]
+`
+
 var (
+	tpl    *template.Template
 	dbpool *pgxpool.Pool
 	err    error
 )
 
 func main() {
+	tpl = template.Must(template.New("config").Parse(configTpl))
+
 	dbpool, err = pgxpool.Connect(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
 	defer dbpool.Close()
 
-	http.HandleFunc("/", decoderHandle)
-	if err := http.ListenAndServe(":1919", nil); err != nil {
+	router := gin.Default()
+
+	router.GET("/ota/config", configOtaHandle)
+	router.POST("/submit", submitHandle)
+
+	if err := router.Run(":1919"); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func decoderHandle(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+func configOtaHandle(c *gin.Context) {
+	clientID := c.Query("client_id")
+	if clientID == "" {
+		c.String(http.StatusBadRequest, "Client ID missing.")
+		return
+	}
 
-	payload, _ := ioutil.ReadAll(r.Body)
+	row := dbpool.QueryRow(context.Background(), `SELECT
+		id,
+		wakeup_threshold,
+		wifi_connect_timeout,
+		scan_time,
+		sleep_time,
+		ap_name,
+		ap_pass,
+		upload_url,
+		ota_url,
+		max_packet_size,
+		max_frames_per_packet
+	FROM clients WHERE id = $1`, clientID)
+	var clientConfig struct {
+		ID                 uint
+		WakeupThreshold    uint
+		WifiConnectTimeout uint
+		ScanTime           uint
+		SleepTime          uint
+		ApName             string
+		ApPass             string
+		UploadURL          string
+		OtaURL             string
+		MaxPacketSize      uint
+		MaxFramesPerPacket uint
+	}
+	if err := row.Scan(
+		&clientConfig.ID,
+		&clientConfig.WakeupThreshold,
+		&clientConfig.WifiConnectTimeout,
+		&clientConfig.ScanTime,
+		&clientConfig.SleepTime,
+		&clientConfig.ApName,
+		&clientConfig.ApPass,
+		&clientConfig.UploadURL,
+		&clientConfig.OtaURL,
+		&clientConfig.MaxPacketSize,
+		&clientConfig.MaxFramesPerPacket,
+	); err != nil {
+		log.Println(err)
+		c.String(http.StatusBadRequest, "Scanning row failed.")
+		return
+	}
+
+	config := new(strings.Builder)
+	if err := tpl.Execute(config, clientConfig); err != nil {
+		log.Println(err)
+		c.String(http.StatusInternalServerError, "Template didn't execute.")
+		return
+	}
+
+	digest := sha256.Sum256([]byte(config.String()))
+	configHash := hex.EncodeToString(digest[:])
+	c.Header("Hash", configHash)
+	c.String(http.StatusOK, config.String())
+}
+
+func submitHandle(c *gin.Context) {
+	payload, _ := c.GetRawData()
 
 	packet, err := parsePacket(payload)
 	if err != nil {
-		http.Error(w, "Can't decode packet.", http.StatusBadRequest)
-		fmt.Println(err)
+		c.String(http.StatusBadRequest, "Can't decode packet.")
 		return
 	}
 
@@ -72,43 +172,13 @@ func decoderHandle(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 
-		var beacons []beacon_go_t
 		for _, b := range frame.Beacons {
 			bg := b.toGoType()
-			beacons = append(beacons, bg)
 			if _, err := dbpool.Exec(context.Background(), "INSERT INTO beacons(data, rssi, frame_id) VALUES ($1, $2, $3)", bg.Data, bg.RSSI, frameID); err != nil {
 				log.Println(err)
 			}
 		}
-
-		bla := struct {
-			Client           int16
-			Timestamp        int32
-			Battery          uint16
-			HallSensor       int16
-			TemperaturSensor int16
-			Wifis            []wifi_go_t
-			Beacons          []beacon_go_t
-		}{
-			packet.Header.ClientID,
-			frame.Header.TimeStamp,
-			frame.Header.BatteryStatus,
-			frame.Header.HallSensor,
-			frame.Header.TemperaturSensor,
-			wifis,
-			beacons,
-		}
-
-		j, err := json.MarshalIndent(bla, "", "  ")
-		if err != nil {
-			log.Println(err)
-		}
-
-		fmt.Println(string(j))
 	}
 
-	if _, err := w.Write(packet.Checksum[:]); err != nil {
-		fmt.Println("Response failed:", err)
-		return
-	}
+	c.Data(http.StatusOK, "application/octet-stream", packet.Checksum[:])
 }
