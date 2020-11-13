@@ -108,7 +108,9 @@ def otaUpdateConfig():
         or (ubinascii.crc32(uos.urandom(1)) % 50) == 0  # if randInt%10 == 0
     ):
         try:
-            r = uuurequests.get(config.OTA_URL + "config?client_id=" + config.CLIENT_ID)
+            r = uuurequests.get(
+                "{}/config?client_id={}".format(config.OTA_URL, config.CLIENT_ID)
+            )
             if (r.status_code == 200) and (
                 r.headers["Hash"] == uhashlib.sha256(r.content).digest()
             ):
