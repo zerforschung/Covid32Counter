@@ -112,7 +112,8 @@ def otaUpdateConfig():
                 "{}/config?client_id={}".format(config.OTA_URL, config.CLIENT_ID)
             )
             if (r.status_code == 200) and (
-                r.headers["Hash"] == uhashlib.sha256(r.content).digest()
+                ubinascii.unhexlify(r.headers["Hash"])
+                == uhashlib.sha256(r.content).digest()
             ):
                 with openFile("config.py") as f:
                     f.write(r.content)
