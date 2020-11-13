@@ -47,11 +47,16 @@ def bleInterruptHandler(event: int, data):
         return
 
 
+FIRMWARE_VERSION = "v1.1.0"
+
 wakeupCounter = 0
 needsUpload = False
 
 try:
     machine.freq(80000000)
+
+    util.syslog("Machine", "Firmware {}".format(FIRMWARE_VERSION))
+
     util.syslog("RTC", "Init...")
     rtc = machine.RTC()
 
