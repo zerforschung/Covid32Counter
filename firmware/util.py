@@ -98,8 +98,7 @@ def syncTime():
             ntptime.settime()
             syslog("Time", "Synced via NTP.")
         except Exception as e:
-            syslog("Time", "Error getting NTP: {}", e)
-            pass
+            syslog("Time", "Error getting NTP: {}".format(e))
 
 
 def otaUpdateConfig():
@@ -119,5 +118,4 @@ def otaUpdateConfig():
             else:
                 syslog("OTA", "Hash mismatch, cowardly refusing to install update!")
         except Exception as e:
-            syslog("OTA", "Error getting updates: {}", e)
-            pass
+            syslog("OTA", "Error getting updates: {}".format(e))
