@@ -85,6 +85,8 @@ try:
         util.second_to_microsecond(config.SCAN_TIME),
     )
 
+    battery_level = adc.read_u16()
+
     ble_scan_done = False
     while not ble_scan_done:
         utime.sleep_ms(10)
@@ -104,7 +106,7 @@ try:
     gc.collect()
 
     framePayload = ustruct.pack(">i", util.now())  # encode timestamp
-    framePayload += ustruct.pack(">H", adc.read_u16())  # encode battery level
+    framePayload += ustruct.pack(">H", battery_level)  # encode battery level
     framePayload += ustruct.pack(">h", esp32.hall_sensor())  # encode hall sensor
     framePayload += ustruct.pack(
         ">h", esp32.raw_temperature()
