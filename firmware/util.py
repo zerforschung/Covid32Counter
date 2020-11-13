@@ -115,8 +115,9 @@ def otaUpdateConfig():
                 ubinascii.unhexlify(r.headers["Hash"])
                 == uhashlib.sha256(r.content).digest()
             ):
-                with openFile("config.py") as f:
+                with openFile("new_config.py") as f:
                     f.write(r.content)
+                uos.rename("new_config.py", "config.py")
                 syslog("OTA", "Updated config.py")
             else:
                 syslog("OTA", "Hash mismatch, cowardly refusing to install update!")
