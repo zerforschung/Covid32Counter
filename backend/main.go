@@ -122,6 +122,10 @@ func configOtaHandle(c *gin.Context) {
 		return
 	}
 
+	if _, err := dbpool.Exec(context.Background(), "UPDATE clients SET last_ota_timestamp = NOW() WHERE id = $1", clientID); err != nil {
+		log.Println(err)
+	}
+
 	config := new(strings.Builder)
 	if err := tpl.Execute(config, clientConfig); err != nil {
 		log.Println(err)
