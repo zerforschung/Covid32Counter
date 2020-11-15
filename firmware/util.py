@@ -86,26 +86,18 @@ def openFile(filename: str):
 
 
 def syncTime():
-    if (
-        (machine.reset_cause() != machine.DEEPSLEEP)  # if fresh start
-        and (machine.reset_cause() != machine.WDT_RESET)  # but not from brownout
-        or (
-            EPOCH_OFFSET + utime.time() < const(1600000000)
-        )  # if time is before 2020-09-13
-        or ((ubinascii.crc32(uos.urandom(1)) % 10) == 0)  # if randInt%10 == 0
-    ):
-        try:
-            ntptime.settime()
-            syslog("Time", "Synced via NTP.")
-        except Exception as e:
-            syslog("Time", "Error getting NTP: {}".format(e))
+    try:
+        ntptime.settime()
+        syslog("Time", "Synced via NTP.")
+    except Exception as e:
+        syslog("Time", "Error getting NTP: {}".format(e))
 
 
 def otaUpdateConfig():
     if (
         (machine.reset_cause() != machine.DEEPSLEEP)  # if fresh start
         and (machine.reset_cause() != machine.WDT_RESET)  # but not from brownout
-        or (ubinascii.crc32(uos.urandom(1)) % 50) == 0  # if randInt%10 == 0
+        or (ubinascii.crc32(uos.urandom(1)) % 10) == 0  # if randInt%10 == 0
     ):
         try:
             r = uuurequests.get(
