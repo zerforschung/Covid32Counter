@@ -47,7 +47,7 @@ def bleInterruptHandler(event: int, data):
         return
 
 
-FIRMWARE_VERSION = "v1.1.0"
+FIRMWARE_VERSION = "v1.1.1"
 
 wakeupCounter = 0
 needsUpload = False
@@ -102,7 +102,10 @@ try:
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     wlan.disconnect()
-    nets = wlan.scan()
+    try:
+        nets = wlan.scan()
+    except Exception:
+        nets = []
     if not needsUpload:
         util.syslog("Wifi", "Stopping Wifi...")
         wlan.active(False)
