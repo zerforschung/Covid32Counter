@@ -11,6 +11,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -130,13 +131,92 @@ func main() {
 	defer dbpool.Close()
 
 	router := gin.Default()
+	router.Use(cors.Default())
 
+	// API Endpoints
+	router.GET("/frames/recent", recentFramesHandle)
+
+	// Firmware Endpoints
 	router.GET("/ota/config", configOtaHandle)
 	router.POST("/submit", submitHandle)
 
 	if err := router.Run(":1919"); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func recentFramesHandle(c *gin.Context) {
+	clientID := c.Query("client_id")
+	count := c.Query("count")
+	showAllClients := false
+
+	if clientID == "" {
+		clientID = "0"
+		showAllClients = true
+	}
+	if count == "" {
+		count = "10"
+	}
+
+	rows, err := dbpool.Query(context.Background(), `SELECT
+		id,
+		client_id,
+		timestamp,
+		battery,
+		hall_sensor,
+		temperatur_sensor,
+		wifis,
+		beacon_count,
+		received_timestamp
+	FROM frames
+	WHERE client_id = $1 OR $2
+	ORDER BY timestamp DESC
+	LIMIT $3`, clientID, showAllClients, count)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			c.JSON(http.StatusNoContent, nil)
+			return
+		}
+
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, nil)
+		return
+	}
+
+	type frame struct {
+		ID                uint        `json:"id"`
+		ClientID          uint        `json:"client_id"`
+		Timestamp         time.Time   `json:"timestamp"`
+		Battery           uint        `json:"battery"`
+		HallSensor        uint        `json:"hall_sensor"`
+		TemperaturSensor  uint        `json:"temperatur_sensor"`
+		Wifis             []wifi_go_t `json:"wifis"`
+		BeaconCount       uint        `json:"beacon_count"`
+		ReceivedTimestamp time.Time   `json:"received_timestamp"`
+	}
+
+	var frames []frame
+	for rows.Next() {
+		var f frame
+		if err := rows.Scan(
+			&f.ID,
+			&f.ClientID,
+			&f.Timestamp,
+			&f.Battery,
+			&f.HallSensor,
+			&f.TemperaturSensor,
+			&f.Wifis,
+			&f.BeaconCount,
+			&f.ReceivedTimestamp,
+		); err != nil {
+			log.Println(err)
+			c.JSON(http.StatusInternalServerError, nil)
+			return
+		}
+		frames = append(frames, f)
+	}
+
+	c.JSON(http.StatusOK, frames)
 }
 
 func configOtaHandle(c *gin.Context) {
@@ -186,7 +266,7 @@ func configOtaHandle(c *gin.Context) {
 		&clientConfig.MaxFramesPerPacket,
 	); err != nil {
 		log.Println(err)
-		c.String(http.StatusBadRequest, "Scanning row failed.")
+		c.String(http.StatusInternalServerError, "Scanning row failed.")
 		return
 	}
 
