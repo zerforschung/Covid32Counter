@@ -36,7 +36,6 @@ SSID_EXCLUDE_PREFIX = [
 ]
 SSID_EXCLUDE_SUFFIX = [
     "_nomap",
-    "iPhone",
 ]
 SSID_EXCLUDE_REGEX = [
     ".*[M|m]obile[ |\-|_]?[H|h]otspot.*",
@@ -44,6 +43,8 @@ SSID_EXCLUDE_REGEX = [
     ".*[M|m][I|i][\-]?[F|f][I|i].*",
     ".*Samsung.*",
     ".*BlackBerry.*",
+    ".*iPhone.*",
+    ".*iPad.*",
 ]
 `
 
