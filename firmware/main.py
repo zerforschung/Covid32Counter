@@ -47,7 +47,7 @@ def bleInterruptHandler(event: int, data):
         return
 
 
-FIRMWARE_VERSION = "v1.1.1"
+FIRMWARE_VERSION = "v1.2.0"
 
 wakeupCounter = 0
 needsUpload = False
@@ -164,11 +164,11 @@ try:
             if has_web_connection:
                 util.syslog("Network", "We should have a web connection")
 
-                # syncs time over NTP if needed
+                # sync time over NTP
                 util.syncTime()
                 gc.collect()
 
-                # update config OTA if needed
+                # update config over the air
                 util.otaUpdateConfig()
                 gc.collect()
 

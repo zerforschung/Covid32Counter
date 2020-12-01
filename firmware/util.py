@@ -97,7 +97,7 @@ def otaUpdateConfig():
     if (
         (machine.reset_cause() != machine.DEEPSLEEP)  # if fresh start
         and (machine.reset_cause() != machine.WDT_RESET)  # but not from brownout
-        or (ubinascii.crc32(uos.urandom(1)) % 10) == 0  # if randInt%10 == 0
+        or (ubinascii.crc32(uos.urandom(1)) % config.OTA_INTERVAL) == 0
     ):
         try:
             r = uuurequests.get(

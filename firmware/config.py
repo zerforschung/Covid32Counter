@@ -9,6 +9,7 @@ AP_NAME = "Hotspot"
 AP_PASS = ""
 UPLOAD_URL = "http://backend:1919/submit"
 OTA_URL = "http://backend:1919/ota"
+OTA_INTERVAL = 10  # if (randInt % config.OTA_INTERVAL) == 0
 MAX_PACKET_SIZE = const(10000)  # bytes
 MAX_FRAMES_PER_PACKET = const(30)
 
