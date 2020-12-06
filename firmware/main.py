@@ -50,6 +50,9 @@ def bleInterruptHandler(event: int, data):
 FIRMWARE_VERSION = "v1.2.0"
 
 wakeupCounter = 0
+otaCounter = 0
+emptyWifiCounter = 0
+extendSleep = False
 needsUpload = False
 
 try:
@@ -65,8 +68,10 @@ try:
         util.syslog("RTC", "RTC-RAM clean...")
         needsUpload = True
     else:
-        # RTC-RAM not empty, get wakeupCounter
-        wakeupCounter = ustruct.unpack(">B", rtc.memory())[0]
+        # RTC-RAM not empty, get stored values
+        wakeupCounter, otaCounter, emptyWifiCounter = ustruct.unpack(
+            ">3B", rtc.memory()
+        )
 
     wakeupCounter += 1
     if wakeupCounter > config.WAKEUP_THRESHOLD:
@@ -112,6 +117,12 @@ try:
     nets = util.removeIgnoredSSIDs(nets)
 
     gc.collect()
+
+    emptyWifiCounter += 1
+    if len(nets) > 0:
+        emptyWifiCounter = 0
+    if emptyWifiCounter > config.EMPTY_WIFI_THRESHOLD:
+        extendSleep = True
 
     framePayload = ustruct.pack(">i", util.now())  # encode timestamp
     framePayload += ustruct.pack(">H", battery_level)  # encode battery level
@@ -169,8 +180,15 @@ try:
                 gc.collect()
 
                 # update config over the air
-                util.otaUpdateConfig()
-                gc.collect()
+                # (if reset but not by brownout, or configured interval is reached)
+                if (
+                    (machine.reset_cause() != machine.DEEPSLEEP)
+                    and (machine.reset_cause() != machine.WDT_RESET)
+                    or (otaCounter > config.OTA_INTERVAL)
+                ):
+                    util.otaUpdateConfig()
+                    gc.collect()
+                    otaCounter = 0
 
                 util.syslog("Upload", "Uploading stored measurements...")
 
@@ -229,6 +247,7 @@ try:
                         gc.collect()
 
                     wakeupCounter = 0
+                    otaCounter += 1
 
                 except Exception as e:
                     util.syslog(
@@ -259,11 +278,18 @@ try:
                 wakeupCounter - config.WAKEUP_THRESHOLD
             ),
         )
-    rtc.memory(ustruct.pack(">B", wakeupCounter))
+    rtc.memory(ustruct.pack(">3B", wakeupCounter, otaCounter, emptyWifiCounter))
 
 except Exception as e:
     util.syslog("Machine", "General error: {}".format(e))
 
 
-util.syslog("Machine", "Going to sleep for {} seconds...".format(config.SLEEP_TIME))
-machine.deepsleep(util.second_to_millisecond(config.SLEEP_TIME))
+sleepTime = config.SLEEP_TIME
+if extendSleep:
+    sleepTime = config.EXTENDED_SLEEP_TIME
+
+util.syslog(
+    "Machine",
+    "Going to sleep for {} seconds...".format(sleepTime),
+)
+machine.deepsleep(util.second_to_millisecond(sleepTime))

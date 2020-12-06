@@ -1,5 +1,4 @@
 from micropython import const
-import machine
 import ntptime
 import ubinascii
 import uhashlib
@@ -94,24 +93,19 @@ def syncTime():
 
 
 def otaUpdateConfig():
-    if (
-        (machine.reset_cause() != machine.DEEPSLEEP)  # if fresh start
-        and (machine.reset_cause() != machine.WDT_RESET)  # but not from brownout
-        or (ubinascii.crc32(uos.urandom(1)) % config.OTA_INTERVAL) == 0
-    ):
-        try:
-            r = uuurequests.get(
-                "{}/config?client_id={}".format(config.OTA_URL, config.CLIENT_ID)
-            )
-            if (r.status_code == 200) and (
-                ubinascii.unhexlify(r.headers["Hash"])
-                == uhashlib.sha256(r.content).digest()
-            ):
-                with openFile("new_config.py") as f:
-                    f.write(r.content)
-                uos.rename("new_config.py", "config.py")
-                syslog("OTA", "Updated config.py")
-            else:
-                syslog("OTA", "Hash mismatch, cowardly refusing to install update!")
-        except Exception as e:
-            syslog("OTA", "Error getting updates: {}".format(e))
+    try:
+        r = uuurequests.get(
+            "{}/config?client_id={}".format(config.OTA_URL, config.CLIENT_ID)
+        )
+        if (r.status_code == 200) and (
+            ubinascii.unhexlify(r.headers["Hash"])
+            == uhashlib.sha256(r.content).digest()
+        ):
+            with openFile("new_config.py") as f:
+                f.write(r.content)
+            uos.rename("new_config.py", "config.py")
+            syslog("OTA", "Updated config.py")
+        else:
+            syslog("OTA", "Hash mismatch, cowardly refusing to install update!")
+    except Exception as e:
+        syslog("OTA", "Error getting updates: {}".format(e))
