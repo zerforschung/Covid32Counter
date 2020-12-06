@@ -109,3 +109,15 @@ def otaUpdateConfig():
             syslog("OTA", "Hash mismatch, cowardly refusing to install update!")
     except Exception as e:
         syslog("OTA", "Error getting updates: {}".format(e))
+
+
+def isSpecialWifi(ssid: str, mac: bytes) -> bool:
+    for specialSSID in config.SPECIAL_SSIDS:
+        if ssid == specialSSID:
+            return True
+
+    for specialMac in config.SPECIAL_MACS:
+        if mac == specialMac:
+            return True
+
+    return False

@@ -142,6 +142,11 @@ try:
         if ssid.decode() == config.AP_NAME:
             ap_available = True
 
+        # only check if we need to use extended sleep if we don't already know
+        if not extendSleep:
+            if util.isSpecialWifi(ssid, mac):
+                extendSleep = True
+
     # encode beacons
     for beacon, rssi in beacons.items():
         framePayload += ustruct.pack(">20sb", beacon, rssi)
