@@ -18,18 +18,22 @@ import (
 )
 
 const configTpl = `from micropython import const
+import ubinascii
 
 CLIENT_ID = const({{.ID}})
 WAKEUP_THRESHOLD = const({{.WakeupThreshold}})  # upload every N wakeups
 WIFI_CONNECT_TIMEOUT = const({{.WifiConnectTimeout}})  # seconds
 SCAN_TIME = const({{.ScanTime}})  # seconds
 SLEEP_TIME = const({{.SleepTime}})  # seconds
+EXTENDED_SLEEP_TIME = const(300)  # seconds
 AP_NAME = "{{.ApName}}"
 AP_PASS = "{{.ApPass}}"
 UPLOAD_URL = "{{.UploadURL}}"
 OTA_URL = "{{.OtaURL}}"
+OTA_INTERVAL = 10  # OTA every N uploads
 MAX_PACKET_SIZE = const({{.MaxPacketSize}})  # bytes
 MAX_FRAMES_PER_PACKET = const({{.MaxFramesPerPacket}})
+EMPTY_WIFI_THRESHOLD = const(10)  # after N scans with no wifis, use EXTENDED_SLEEP_TIME
 
 SSID_EXCLUDE_PREFIX = [
     "AndroidAP",
@@ -46,6 +50,13 @@ SSID_EXCLUDE_REGEX = [
     ".*iPhone.*",
     ".*iPad.*",
 ]
+
+SPECIAL_SSIDS = []
+__SPECIAL_MACS = []
+
+SPECIAL_MACS = []
+for mac in SPECIAL_MACS:
+    SPECIAL_MACS.append(ubinascii.unhexlify(mac))
 `
 
 var (
