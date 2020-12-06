@@ -146,7 +146,7 @@ try:
 
         # only check if we need to use extended sleep if we don't already know
         if not extendSleep:
-            if util.isDepotWifi(ssid, mac):
+            if util.isDepotWifi(ssid.decode(), mac):
                 extendSleep = True
 
     # encode beacons
