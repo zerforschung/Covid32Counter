@@ -1,5 +1,4 @@
 from micropython import const
-import machine
 import ntptime
 import ubinascii
 import uhashlib
@@ -17,6 +16,9 @@ IRQ_SCAN_DONE = const(6)
 EPOCH_OFFSET = const(946681200)  # seconds between 1970 and 2000
 
 ONBOARD_LED = const(2)
+
+__DEPOT_SSIDS = set()
+__DEPOT_MACS = set()
 
 
 def removeIgnoredSSIDs(nets):
@@ -94,24 +96,40 @@ def syncTime():
 
 
 def otaUpdateConfig():
-    if (
-        (machine.reset_cause() != machine.DEEPSLEEP)  # if fresh start
-        and (machine.reset_cause() != machine.WDT_RESET)  # but not from brownout
-        or (ubinascii.crc32(uos.urandom(1)) % 10) == 0  # if randInt%10 == 0
-    ):
-        try:
-            r = uuurequests.get(
-                "{}/config?client_id={}".format(config.OTA_URL, config.CLIENT_ID)
-            )
-            if (r.status_code == 200) and (
-                ubinascii.unhexlify(r.headers["Hash"])
-                == uhashlib.sha256(r.content).digest()
-            ):
-                with openFile("new_config.py") as f:
-                    f.write(r.content)
-                uos.rename("new_config.py", "config.py")
-                syslog("OTA", "Updated config.py")
-            else:
-                syslog("OTA", "Hash mismatch, cowardly refusing to install update!")
-        except Exception as e:
-            syslog("OTA", "Error getting updates: {}".format(e))
+    try:
+        r = uuurequests.get(
+            "{}/config?client_id={}".format(config.OTA_URL, config.CLIENT_ID)
+        )
+        if (r.status_code == 200) and (
+            ubinascii.unhexlify(r.headers["Hash"])
+            == uhashlib.sha256(r.content).digest()
+        ):
+            with openFile("new_config.py") as f:
+                f.write(r.content)
+            uos.rename("new_config.py", "config.py")
+            syslog("OTA", "Updated config.py")
+        else:
+            syslog("OTA", "Hash mismatch, cowardly refusing to install update!")
+    except Exception as e:
+        syslog("OTA", "Error getting updates: {}".format(e))
+
+
+def prepareDepotWifiSets():
+    for ssid in config.DEPOT_SSIDS:
+        __DEPOT_SSIDS.add(ssid)
+
+    for mac in config.DEPOT_MACS:
+        mac = mac.replace(":", "")
+        mac = mac.replace("-", "")
+        mac = mac.replace(" ", "")
+        __DEPOT_MACS.add(ubinascii.unhexlify(mac))
+
+
+def isDepotWifi(ssid: str, mac: bytes) -> bool:
+    if ssid in __DEPOT_SSIDS:
+        return True
+
+    if mac in __DEPOT_MACS:
+        return True
+
+    return False
