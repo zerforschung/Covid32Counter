@@ -55,7 +55,7 @@ SPECIAL_SSIDS = []
 __SPECIAL_MACS = []
 
 SPECIAL_MACS = []
-for mac in SPECIAL_MACS:
+for mac in __SPECIAL_MACS:
     mac = mac.replace(":", "")
     mac = mac.replace("-", "")
     mac = mac.replace(" ", "")
