@@ -116,13 +116,13 @@ def otaUpdateConfig():
 
 def prepareSpecialWifiSets():
     for ssid in config.SPECIAL_SSIDS:
-        __SPECIAL_SSIDS.add([ssid])
+        __SPECIAL_SSIDS.add(ssid)
 
     for mac in config.SPECIAL_MACS:
         mac = mac.replace(":", "")
         mac = mac.replace("-", "")
         mac = mac.replace(" ", "")
-        __SPECIAL_MACS.add([ubinascii.unhexlify(mac)])
+        __SPECIAL_MACS.add(ubinascii.unhexlify(mac))
 
 
 def isSpecialWifi(ssid: str, mac: bytes) -> bool:
