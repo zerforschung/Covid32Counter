@@ -17,8 +17,8 @@ EPOCH_OFFSET = const(946681200)  # seconds between 1970 and 2000
 
 ONBOARD_LED = const(2)
 
-__SPECIAL_SSIDS = set()
-__SPECIAL_MACS = set()
+__DEPOT_SSIDS = set()
+__DEPOT_MACS = set()
 
 
 def removeIgnoredSSIDs(nets):
@@ -114,22 +114,22 @@ def otaUpdateConfig():
         syslog("OTA", "Error getting updates: {}".format(e))
 
 
-def prepareSpecialWifiSets():
-    for ssid in config.SPECIAL_SSIDS:
-        __SPECIAL_SSIDS.add(ssid)
+def prepareDepotWifiSets():
+    for ssid in config.DEPOT_SSIDS:
+        __DEPOT_SSIDS.add(ssid)
 
-    for mac in config.SPECIAL_MACS:
+    for mac in config.DEPOT_MACS:
         mac = mac.replace(":", "")
         mac = mac.replace("-", "")
         mac = mac.replace(" ", "")
-        __SPECIAL_MACS.add(ubinascii.unhexlify(mac))
+        __DEPOT_MACS.add(ubinascii.unhexlify(mac))
 
 
-def isSpecialWifi(ssid: str, mac: bytes) -> bool:
-    if ssid in __SPECIAL_SSIDS:
+def isDepotWifi(ssid: str, mac: bytes) -> bool:
+    if ssid in __DEPOT_SSIDS:
         return True
 
-    if mac in __SPECIAL_MACS:
+    if mac in __DEPOT_MACS:
         return True
 
     return False

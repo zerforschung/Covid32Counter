@@ -50,8 +50,8 @@ SSID_EXCLUDE_REGEX = [
     ".*iPad.*",
 ]
 
-SPECIAL_SSIDS = []
-SPECIAL_MACS = []
+DEPOT_SSIDS = []
+DEPOT_MACS = []
 `
 
 var (

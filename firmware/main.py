@@ -133,7 +133,7 @@ try:
     framePayload += ustruct.pack(">B", len(nets))  # encode wifi count
     framePayload += ustruct.pack(">B", len(beacons))  # encode BLE beacon count
 
-    util.prepareSpecialWifiSets()
+    util.prepareDepotWifiSets()
 
     ap_available = False
     for net in nets:
@@ -146,7 +146,7 @@ try:
 
         # only check if we need to use extended sleep if we don't already know
         if not extendSleep:
-            if util.isSpecialWifi(ssid, mac):
+            if util.isDepotWifi(ssid, mac):
                 extendSleep = True
 
     # encode beacons
