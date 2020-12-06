@@ -56,6 +56,9 @@ __SPECIAL_MACS = []
 
 SPECIAL_MACS = []
 for mac in SPECIAL_MACS:
+    mac = mac.replace(":", "")
+    mac = mac.replace("-", "")
+    mac = mac.replace(" ", "")
     SPECIAL_MACS.append(ubinascii.unhexlify(mac))
 `
 
