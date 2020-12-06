@@ -24,15 +24,15 @@ WAKEUP_THRESHOLD = const({{.WakeupThreshold}})  # upload every N wakeups
 WIFI_CONNECT_TIMEOUT = const({{.WifiConnectTimeout}})  # seconds
 SCAN_TIME = const({{.ScanTime}})  # seconds
 SLEEP_TIME = const({{.SleepTime}})  # seconds
-EXTENDED_SLEEP_TIME = const(300)  # seconds
+EXTENDED_SLEEP_TIME = const({{.ExtendedSleepTime}})  # seconds
 AP_NAME = "{{.ApName}}"
 AP_PASS = "{{.ApPass}}"
 UPLOAD_URL = "{{.UploadURL}}"
 OTA_URL = "{{.OtaURL}}"
-OTA_INTERVAL = 10  # OTA every N uploads
+OTA_INTERVAL = {{.OtaInterval}}  # OTA every N uploads
 MAX_PACKET_SIZE = const({{.MaxPacketSize}})  # bytes
 MAX_FRAMES_PER_PACKET = const({{.MaxFramesPerPacket}})
-EMPTY_WIFI_THRESHOLD = const(10)  # after N scans with no wifis, use EXTENDED_SLEEP_TIME
+EMPTY_WIFI_THRESHOLD = const({{.EmptyWifiThreshold}})  # after N scans with no wifis, use EXTENDED_SLEEP_TIME
 
 SSID_EXCLUDE_PREFIX = [
     "AndroidAP",
@@ -171,12 +171,15 @@ func configOtaHandle(c *gin.Context) {
 		wifi_connect_timeout,
 		scan_time,
 		sleep_time,
+		extended_sleep_time,
 		ap_name,
 		ap_pass,
 		upload_url,
 		ota_url,
+		ota_interval,
 		max_packet_size,
-		max_frames_per_packet
+		max_frames_per_packet,
+		empty_wifi_threshold
 	FROM clients WHERE id = $1`, clientID)
 	var clientConfig struct {
 		ID                 uint
@@ -184,12 +187,15 @@ func configOtaHandle(c *gin.Context) {
 		WifiConnectTimeout uint
 		ScanTime           uint
 		SleepTime          uint
+		ExtendedSleepTime  uint
 		ApName             string
 		ApPass             string
 		UploadURL          string
 		OtaURL             string
+		OtaInterval        uint
 		MaxPacketSize      uint
 		MaxFramesPerPacket uint
+		EmptyWifiThreshold uint
 	}
 	if err := row.Scan(
 		&clientConfig.ID,
@@ -197,12 +203,15 @@ func configOtaHandle(c *gin.Context) {
 		&clientConfig.WifiConnectTimeout,
 		&clientConfig.ScanTime,
 		&clientConfig.SleepTime,
+		&clientConfig.ExtendedSleepTime,
 		&clientConfig.ApName,
 		&clientConfig.ApPass,
 		&clientConfig.UploadURL,
 		&clientConfig.OtaURL,
+		&clientConfig.OtaInterval,
 		&clientConfig.MaxPacketSize,
 		&clientConfig.MaxFramesPerPacket,
+		&clientConfig.EmptyWifiThreshold,
 	); err != nil {
 		log.Println(err)
 		c.String(http.StatusInternalServerError, "Scanning row failed.")
