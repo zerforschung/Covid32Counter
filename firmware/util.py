@@ -111,13 +111,22 @@ def otaUpdateConfig():
         syslog("OTA", "Error getting updates: {}".format(e))
 
 
-def isSpecialWifi(ssid: str, mac: bytes) -> bool:
-    for specialSSID in config.SPECIAL_SSIDS:
-        if ssid == specialSSID:
-            return True
+def prepareSpecialWifiHashmaps():
+    for ssid in config.SPECIAL_SSIDS:
+        config.__SPECIAL_SSIDS.add([ssid])
 
-    for specialMac in config.SPECIAL_MACS:
-        if mac == specialMac:
-            return True
+    for mac in config.SPECIAL_MACS:
+        mac = mac.replace(":", "")
+        mac = mac.replace("-", "")
+        mac = mac.replace(" ", "")
+        config.__SPECIAL_MACS.add([ubinascii.unhexlify(mac)])
+
+
+def isSpecialWifi(ssid: str, mac: bytes) -> bool:
+    if ssid in config.__SPECIAL_SSIDS:
+        return True
+
+    if mac in config.__SPECIAL_MACS:
+        return True
 
     return False
