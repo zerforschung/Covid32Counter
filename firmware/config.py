@@ -1,5 +1,4 @@
 from micropython import const
-import ubinascii
 
 CLIENT_ID = const(1337)
 WAKEUP_THRESHOLD = const(10)  # upload every N wakeups
@@ -33,11 +32,4 @@ SSID_EXCLUDE_REGEX = [
 ]
 
 SPECIAL_SSIDS = []
-__SPECIAL_MACS = []
-
 SPECIAL_MACS = []
-for mac in __SPECIAL_MACS:
-    mac = mac.replace(":", "")
-    mac = mac.replace("-", "")
-    mac = mac.replace(" ", "")
-    SPECIAL_MACS.append(ubinascii.unhexlify(mac))
