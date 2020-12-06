@@ -18,7 +18,6 @@ import (
 )
 
 const configTpl = `from micropython import const
-import ubinascii
 
 CLIENT_ID = const({{.ID}})
 WAKEUP_THRESHOLD = const({{.WakeupThreshold}})  # upload every N wakeups
@@ -52,14 +51,7 @@ SSID_EXCLUDE_REGEX = [
 ]
 
 SPECIAL_SSIDS = []
-__SPECIAL_MACS = []
-
 SPECIAL_MACS = []
-for mac in __SPECIAL_MACS:
-    mac = mac.replace(":", "")
-    mac = mac.replace("-", "")
-    mac = mac.replace(" ", "")
-    SPECIAL_MACS.append(ubinascii.unhexlify(mac))
 `
 
 var (
