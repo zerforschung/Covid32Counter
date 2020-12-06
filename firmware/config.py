@@ -33,6 +33,3 @@ SSID_EXCLUDE_REGEX = [
 
 SPECIAL_SSIDS = []
 SPECIAL_MACS = []
-
-__SPECIAL_SSIDS = {}  # leave empty
-__SPECIAL_MACS = {}  # leave empty

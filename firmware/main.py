@@ -133,6 +133,8 @@ try:
     framePayload += ustruct.pack(">B", len(nets))  # encode wifi count
     framePayload += ustruct.pack(">B", len(beacons))  # encode BLE beacon count
 
+    util.prepareSpecialWifiSets()
+
     ap_available = False
     for net in nets:
         ssid, mac, channel, rssi, authmode, hidden = net
