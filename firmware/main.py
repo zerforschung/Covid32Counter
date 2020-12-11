@@ -95,11 +95,14 @@ try:
         util.second_to_microsecond(config.SCAN_TIME),
     )
 
-    battery_level = adc.read_u16()
+    voltage_measurements = []
 
     ble_scan_done = False
     while not ble_scan_done:
+        voltage_measurements.append(adc.read_u16())
         utime.sleep_ms(10)
+
+    battery_level = sorted(voltage_measurements)[0]  # use lowest measured voltage
 
     gc.collect()
 
