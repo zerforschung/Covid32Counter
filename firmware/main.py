@@ -9,7 +9,7 @@ import uhashlib
 import ustruct
 import utime
 
-import captive_bvg
+import captive_swu
 import exposure_notification
 import util
 import uuurequests
@@ -174,7 +174,7 @@ try:
         if connected:
             has_web_connection = False
             try:
-                has_web_connection = captive_bvg.accept_captive_portal()
+                has_web_connection = captive_swu.accept_captive_portal()
                 gc.collect()
             except Exception:
                 util.syslog("Network", "Problem checking online status")
