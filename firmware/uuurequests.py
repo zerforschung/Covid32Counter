@@ -32,7 +32,7 @@ class Response:
         return ujson.loads(self.content)
 
 
-def request(method, url, data=None, json=None, headers={}, stream=None, parse_headers=True):
+def request(method, url, data=None, json=None, headers={}, stream=None, parse_headers=True, follow_redirects=True):
     redir_cnt = 1
     if json is not None:
         assert data is None
@@ -103,7 +103,7 @@ def request(method, url, data=None, json=None, headers={}, stream=None, parse_he
                 if l.startswith(b"Transfer-Encoding:"):
                     if b"chunked" in l:
                         raise ValueError("Unsupported " + l.decode())
-                elif l.startswith(b"Location:") and 300 <= status <= 399:
+                elif l.startswith(b"Location:") and 300 <= status <= 399 and follow_redirects == True:
                     if not redir_cnt:
                         raise ValueError("Too many redirects")
                     redir_cnt -= 1
@@ -124,7 +124,7 @@ def request(method, url, data=None, json=None, headers={}, stream=None, parse_he
             s.close()
             raise
 
-        if status != 300:
+        if status != 300 or follow_redirects == False:
             break
 
     resp = Response(s)
