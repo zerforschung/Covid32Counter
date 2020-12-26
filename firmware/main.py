@@ -58,7 +58,9 @@ needsUpload = False
 try:
     machine.freq(80000000)
 
-    util.syslog("Machine", "Firmware {}".format(FIRMWARE_VERSION))
+    util.syslog(
+        "Machine", "Firmware {} - Client {}".format(FIRMWARE_VERSION, config.CLIENT_ID)
+    )
 
     util.syslog("RTC", "Init...")
     rtc = machine.RTC()
