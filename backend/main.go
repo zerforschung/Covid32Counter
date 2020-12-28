@@ -321,8 +321,8 @@ func recentFramesHandle(c *gin.Context) {
 		ClientID          uint        `json:"client_id"`
 		Timestamp         time.Time   `json:"timestamp"`
 		Battery           uint        `json:"battery"`
-		HallSensor        uint        `json:"hall_sensor"`
-		TemperaturSensor  uint        `json:"temperatur_sensor"`
+		HallSensor        int         `json:"hall_sensor"`
+		TemperaturSensor  int         `json:"temperatur_sensor"`
 		Wifis             []wifi_go_t `json:"wifis"`
 		BeaconCount       uint        `json:"beacon_count"`
 		ReceivedTimestamp time.Time   `json:"received_timestamp"`
